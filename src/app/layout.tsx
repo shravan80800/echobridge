@@ -3,7 +3,6 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { RoleProvider } from "@/components/layout/RoleContext";
 import { Navbar } from "@/components/layout/Navbar";
-import { RoleScopeBanner } from "@/components/layout/RoleSwitcherBar";
 import { AuditLogDrawer } from "@/components/layout/AuditLogDrawer";
 
 const inter = Inter({
@@ -33,7 +32,6 @@ export default function RootLayout({
       <body className="min-h-screen bg-canvas text-text-primary font-sans antialiased radial-glow selection:bg-accent-primary/30 selection:text-white flex flex-col">
         <RoleProvider>
           <Navbar />
-          <RoleScopeBanner />
           <div className="flex-1">{children}</div>
           <AuditLogDrawer />
         </RoleProvider>

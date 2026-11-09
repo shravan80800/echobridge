@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Upload,
   Cpu,
@@ -10,340 +11,420 @@ import {
   FileCheck2,
   Send,
   BarChart2,
-  AlertTriangle,
   ArrowRight,
-  ShieldAlert,
-  Database,
+  Shield,
+  UserX,
+  Users,
+  UserCheck,
   Lock,
-  Layers,
+  Unlock,
+  CheckCircle2,
 } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
 import { Button } from "@/components/ui/Button";
+import type { Role } from "@/types/echobridge.types";
 
-interface StageCard {
+interface PipelineStage {
   step: number;
-  title: string;
+  label: string;
+  subtitle: string;
+  note: string;
   href: string;
-  description: string;
   icon: React.ComponentType<{ className?: string }>;
-  roleHighlight: string;
-  badge: string;
 }
 
-const stageCards: StageCard[] = [
+const pipelineStages: PipelineStage[] = [
   {
     step: 1,
-    title: "Connect Sources",
+    label: "Connect",
+    subtitle: "Sources & Quarantine",
+    note: "Redacts keys & PII (Trap 4)",
     href: "/connect",
-    description:
-      "Inspect authorised project sources, ACL scopes, and confirm permissions for Incoming Lead vs. Intern.",
     icon: Upload,
-    roleHighlight: "Admin / Departing Lead",
-    badge: "Stage 1",
   },
   {
     step: 2,
-    title: "Parse & Redact",
+    label: "Reconstruct",
+    subtitle: "Retrieve-Only Extract",
+    note: "Pre-Model RBAC (Trap 5)",
     href: "/connect",
-    description:
-      "Review secret & PII quarantine vault (Trap 4) and prompt-injection detection alerts (Trap 6).",
     icon: Cpu,
-    roleHighlight: "Security Pipeline",
-    badge: "Stage 2",
   },
   {
     step: 3,
-    title: "Verify & Draft",
+    label: "Verify",
+    subtitle: "Two-Layer Citations",
+    note: "Author independence rule",
     href: "/draft",
-    description:
-      "Inspect evidence-coloured claims, verbatim quote popovers, and the transparent Confidence Score HUD.",
     icon: ShieldCheck,
-    roleHighlight: "Audience-Scoped",
-    badge: "Stage 3",
   },
   {
     step: 4,
-    title: "Gap-Interview",
-    href: "/gap-interview",
-    description:
-      "Answer unwritten rationale (Redis choice in Trap 2) to turn Red gaps into Blue Attested evidence.",
+    label: "Gap-Interview",
+    subtitle: "Targeted Questions",
+    note: "Red gaps → Blue Attested",
+    href: "/interview",
     icon: HelpCircle,
-    roleHighlight: "Departing Lead Only",
-    badge: "Stage 4",
   },
   {
     step: 5,
-    title: "Reviewer Diff & Approval",
+    label: "Review",
+    subtitle: "Human Approval Gate",
+    note: "Conflict matrix & ADR-007",
     href: "/review",
-    description:
-      "Inspect version diffs (v1.0 -> v1.1 -> v2.0), resolve Purple conflicts (Trap 1), and approve per role.",
     icon: FileCheck2,
-    roleHighlight: "Reviewer / Mentor Only",
-    badge: "Stage 5",
   },
   {
     step: 6,
-    title: "Handover & Receipt",
+    label: "Handover",
+    subtitle: "Plan & Digital Receipt",
+    note: "Quiz + SHA-256 certificate",
     href: "/handover",
-    description:
-      "Delivers Day 1 / Week 1 / Month 1 continuation plan, Critical Risk Quiz, and signed transfer receipt.",
     icon: Send,
-    roleHighlight: "Incoming Member",
-    badge: "Stage 6",
   },
 ];
 
 export default function HomePage() {
-  const { currentRole, currentProfile, switchRole } = useRole();
+  const { currentRole, switchRole } = useRole();
+  const router = useRouter();
+
+  const handleOpenRole = (role: Role, path: string) => {
+    switchRole(role);
+    router.push(path);
+  };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start p-6 md:p-12 max-w-7xl mx-auto space-y-12">
-      {/* Hero Section */}
-      <section className="w-full bg-glass rounded-2xl p-8 md:p-12 border border-white/10 shadow-glow relative overflow-hidden">
-        <div className="max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
-            <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
-            <span>CAMPUSCONNECT DEMO PROJECT LOADED</span>
-            <span>•</span>
-            <span>ZERO-CONFIG READY</span>
-          </div>
+    <main className="flex min-h-screen flex-col items-center justify-start p-4 sm:p-6 md:p-10 max-w-7xl mx-auto space-y-12">
+      {/* ==================================================================== */}
+      {/* PART A: HERO SECTION                                                 */}
+      {/* ==================================================================== */}
+      <section className="w-full text-center max-w-4xl mx-auto space-y-6 pt-4 md:pt-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-accent-primary/10 text-accent-cyan border border-accent-primary/20 select-none">
+          <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+          <span>CAMPUSCONNECT BENCHMARK LOADED</span>
+          <span>•</span>
+          <span>ZERO-CONFIG READY</span>
+        </div>
 
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-text-primary leading-tight">
-            Every claim cited. Every access controlled.{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary to-accent-cyan">
-              Nothing lost when people leave.
-            </span>
-          </h1>
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-text-primary leading-[1.15]">
+          Every claim cited. Every access controlled.{" "}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary via-indigo-400 to-accent-cyan block sm:inline">
+            Nothing lost when people leave.
+          </span>
+        </h1>
 
-          <p className="text-text-secondary text-sm md:text-base leading-relaxed">
-            EchoBridge reconstructs project state from authorised sources, verifies
-            claims with two-layer citation checks, interviews departing leads on
-            unwritten gaps, and shares nothing until a human reviewer approves each
-            role-specific view.
+        <p className="text-text-secondary text-sm sm:text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+          EchoBridge reconstructs project knowledge from authorised sources, verifies
+          claims with two-layer citations, conducts targeted Gap-Interviews with
+          departing leads, and requires human mentor approval before publishing
+          role-scoped handover packages.
+        </p>
+
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => handleOpenRole("departing_member", "/connect")}
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+          >
+            Start Guided Walkthrough
+          </Button>
+
+          <Link href="/metrics">
+            <Button
+              variant="secondary"
+              size="lg"
+              leftIcon={<BarChart2 className="w-4 h-4 text-accent-cyan" />}
+            >
+              Inspect 8 Planted Traps
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      {/* ==================================================================== */}
+      {/* PART B: CHOOSE YOUR ROLE CARD GRID (3 SIMPLE CARDS)                  */}
+      {/* ==================================================================== */}
+      <section className="w-full space-y-4">
+        <div className="text-center max-w-xl mx-auto mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
+            Choose Your Role to Explore
+          </h2>
+          <p className="text-xs sm:text-sm text-text-muted mt-1">
+            Experience the platform through distinct security clearances and responsibilities
           </p>
+        </div>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <Link href="/connect">
-              <Button variant="primary" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                Explore CampusConnect Pipeline
-              </Button>
-            </Link>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Card 1: Departing Developer */}
+          <div
+            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
+              currentRole === "departing_member"
+                ? "border-amber-500/50 shadow-glow"
+                : "border-border-subtle hover:border-amber-500/30"
+            }`}
+          >
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  DEPARTING LEAD
+                </span>
+                <span className="text-[10px] font-mono text-text-muted">Stage 1 &amp; 4</span>
+              </div>
 
-            <Link href="/metrics">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                  <UserX className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Departing Developer
+                  </h3>
+                  <span className="text-xs font-mono text-text-muted">
+                    Aarav Sharma — Lead Dev
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Connect sources &amp; complete the 5-minute Gap-Interview to preserve unwritten rationale.
+              </p>
+
+              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400">✦</span>
+                  <span>Ingest Git PRs, docs, and chat logs</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400">✦</span>
+                  <span>Answer Redis rationale gap (Trap 2)</span>
+                </div>
+                <div className="flex items-center gap-2 text-rose-400">
+                  <span>✕</span>
+                  <span>Self-approval strictly blocked (403)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6">
               <Button
                 variant="secondary"
-                leftIcon={<BarChart2 className="w-4 h-4 text-accent-cyan" />}
+                size="sm"
+                className="w-full justify-center text-xs font-mono text-amber-300 hover:text-white hover:bg-amber-500/20 border-amber-500/30"
+                onClick={() => handleOpenRole("departing_member", "/connect")}
               >
-                Inspect 8 Planted Traps
+                Open as Departing Lead (Aarav) →
               </Button>
-            </Link>
+            </div>
+          </div>
+
+          {/* Card 2: Reviewer / Mentor */}
+          <div
+            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
+              currentRole === "reviewer"
+                ? "border-emerald-500/50 shadow-glow"
+                : "border-border-subtle hover:border-emerald-500/30"
+            }`}
+          >
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  MENTOR APPROVER
+                </span>
+                <span className="text-[10px] font-mono text-text-muted">Stage 5</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Reviewer / Mentor
+                  </h3>
+                  <span className="text-xs font-mono text-text-muted">
+                    Prof. Deshmukh — Approver
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Inspect evidence colours, resolve timeline conflicts, and approve published views.
+              </p>
+
+              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✦</span>
+                  <span>Inspect Quarantine Vault (Trap 4)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✦</span>
+                  <span>Resolve registration conflict (Trap 1)</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <span>✓</span>
+                  <span>Sole authority to publish v2.0 handover</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full justify-center text-xs font-mono text-emerald-300 hover:text-white hover:bg-emerald-500/20 border-emerald-500/30"
+                onClick={() => handleOpenRole("reviewer", "/review")}
+              >
+                Open as Reviewer (Prof. Deshmukh) →
+              </Button>
+            </div>
+          </div>
+
+          {/* Card 3: Incoming Successor (Lead or Intern) */}
+          <div
+            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
+              currentRole === "incoming_lead" || currentRole === "incoming_intern"
+                ? "border-accent-primary/50 shadow-glow"
+                : "border-border-subtle hover:border-accent-primary/30"
+            }`}
+          >
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-accent-primary/10 text-accent-cyan border border-accent-primary/20">
+                  ROLE-SCOPED RECIPIENTS
+                </span>
+                <span className="text-[10px] font-mono text-text-muted">Stage 3 &amp; 6</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-accent-primary/10 border border-accent-primary/20 text-accent-primary">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Incoming Successor
+                  </h3>
+                  <span className="text-xs font-mono text-text-muted">
+                    Riya (Lead) or Kabir (Intern)
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-text-secondary leading-relaxed">
+                View role-filtered Day 1, Week 1, Month 1 plan, pass risk quiz &amp; acknowledge receipt.
+              </p>
+
+              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
+                <div className="flex items-center gap-2">
+                  <Unlock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>Lead: Sees Finance folder ($3,500)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Intern: Finance is 100% withheld</span>
+                </div>
+                <div className="flex items-center gap-2 text-accent-cyan">
+                  <span>✦</span>
+                  <span>Anti-blind risk quiz &amp; SHA-256 receipt</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="justify-center text-[11px] font-mono text-indigo-300 hover:text-white hover:bg-indigo-500/20 border-indigo-500/30 px-2"
+                onClick={() => handleOpenRole("incoming_lead", "/handover")}
+              >
+                Lead (Riya) →
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="justify-center text-[11px] font-mono text-cyan-300 hover:text-white hover:bg-cyan-500/20 border-cyan-500/30 px-2"
+                onClick={() => handleOpenRole("incoming_intern", "/handover")}
+              >
+                Intern (Kabir) →
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Live System KPIs */}
-      <section className="w-full grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-surface border border-border-subtle">
-          <div className="flex items-center justify-between text-text-muted mb-2">
-            <span className="text-xs font-mono uppercase tracking-wider">Sources</span>
-            <Database className="w-4 h-4 text-accent-cyan" />
-          </div>
-          <div className="text-2xl font-bold text-text-primary">8 Sources</div>
-          <p className="text-[11px] text-text-secondary mt-1">
-            Git, chat, runbook, finance folder
-          </p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-surface border border-border-subtle">
-          <div className="flex items-center justify-between text-text-muted mb-2">
-            <span className="text-xs font-mono uppercase tracking-wider">Sanitized Chunks</span>
-            <Layers className="w-4 h-4 text-accent-primary" />
-          </div>
-          <div className="text-2xl font-bold text-text-primary">10 Chunks</div>
-          <p className="text-[11px] text-text-secondary mt-1">
-            Pre-Model RBAC role metadata attached
-          </p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-surface border border-border-subtle">
-          <div className="flex items-center justify-between text-text-muted mb-2">
-            <span className="text-xs font-mono uppercase tracking-wider">Planted Traps</span>
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold text-text-primary">8 of 8 Seeded</div>
-          <p className="text-[11px] text-text-secondary mt-1">
-            100% testable across all 4 roles
-          </p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-surface border border-border-subtle">
-          <div className="flex items-center justify-between text-text-muted mb-2">
-            <span className="text-xs font-mono uppercase tracking-wider">Draft Snapshots</span>
-            <FileCheck2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-bold text-text-primary">v1.0 → v1.1 → v2.0</div>
-          <p className="text-[11px] text-text-secondary mt-1">
-            Lead and Intern audience versions
-          </p>
-        </div>
-      </section>
-
-      {/* 6 Workflow Stages Quick-Jump Grid */}
-      <section className="w-full space-y-6">
-        <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+      {/* ==================================================================== */}
+      {/* PART C: VISUAL 6-STAGE PIPELINE BAR (MATCHING FIGURE 1)              */}
+      {/* ==================================================================== */}
+      <section className="w-full p-6 sm:p-8 rounded-2xl bg-surface border border-border-subtle space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-subtle pb-4">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-text-primary">
-              The 6 Workflow Stages
+            <h2 className="text-lg font-bold text-text-primary tracking-tight">
+              The 6-Stage Epistemic Handover Pipeline
             </h2>
             <p className="text-xs font-mono text-text-muted mt-0.5">
-              Follow the end-to-end trust pipeline from connection to signed receipt
+              Figure 1 Architecture — From multi-modal ingestion to cryptographic sign-off
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-mono text-text-muted">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Dual-Barrier RBAC Active</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {stageCards.map((card) => {
-            const Icon = card.icon;
+        {/* 6-Stage Horizontal Visual Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {pipelineStages.map((stage) => {
+            const Icon = stage.icon;
+
             return (
               <Link
-                key={card.step}
-                href={card.href}
-                className="group p-6 rounded-xl bg-surface border border-border-subtle hover:border-accent-primary/50 hover:bg-surface-hover transition-all flex flex-col justify-between"
+                key={stage.step}
+                href={stage.href}
+                className="group p-3.5 rounded-xl bg-canvas/70 border border-border-subtle hover:border-accent-primary/50 hover:bg-surface-hover transition-all flex flex-col justify-between"
               >
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-accent-cyan px-2 py-0.5 rounded bg-accent-cyan/10 border border-accent-cyan/20">
-                      {card.badge}
+                    <span className="text-[10px] font-mono font-bold text-accent-cyan px-1.5 py-0.2 rounded bg-accent-cyan/10 border border-accent-cyan/20">
+                      Stage {stage.step}
                     </span>
-                    <span className="text-[11px] font-mono text-text-muted">
-                      {card.roleHighlight}
-                    </span>
+                    <Icon className="w-3.5 h-3.5 text-text-muted group-hover:text-accent-primary transition-colors" />
                   </div>
 
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-canvas border border-border-subtle text-accent-primary group-hover:scale-110 transition-transform">
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <h3 className="text-base font-semibold text-text-primary group-hover:text-accent-primary transition-colors">
-                      {card.title}
+                  <div>
+                    <h3 className="text-xs font-bold text-text-primary group-hover:text-accent-primary transition-colors">
+                      {stage.label}
                     </h3>
+                    <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
+                      {stage.subtitle}
+                    </p>
                   </div>
-
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    {card.description}
-                  </p>
                 </div>
 
-                <div className="pt-4 mt-4 border-t border-border-subtle/50 flex items-center justify-between text-xs text-accent-primary font-mono group-hover:translate-x-1 transition-transform">
-                  <span>Enter Stage {card.step}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <div className="pt-2 mt-2 border-t border-border-subtle/50">
+                  <span className="text-[10px] font-mono text-text-muted block leading-tight">
+                    {stage.note}
+                  </span>
                 </div>
               </Link>
             );
           })}
         </div>
-      </section>
 
-      {/* Judge Persona Testing Guide */}
-      <section className="w-full p-8 rounded-xl bg-surface border border-border-subtle space-y-6">
-        <div className="border-b border-border-subtle pb-4">
-          <h2 className="text-lg font-bold text-text-primary">
-            Judge Evaluation Guide: Test the 4 Personas
-          </h2>
-          <p className="text-xs text-text-secondary mt-1">
-            Use the 1-Click Judge Role Switcher in the top command bar to evaluate
-            role separation and server-side RBAC enforcement:
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-          <div
-            onClick={() => switchRole("departing_member")}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              currentRole === "departing_member"
-                ? "border-amber-500 bg-amber-500/10"
-                : "border-border-subtle bg-canvas hover:border-amber-500/50"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-amber-400">1. Departing Lead (Aarav)</span>
-              {currentRole === "departing_member" && (
-                <span className="text-[10px] text-amber-400 font-bold">ACTIVE</span>
-              )}
-            </div>
-            <p className="text-text-secondary text-[11px] font-sans">
-              Test Stage 4 (`/gap-interview`) by answering why Redis was chosen
-              (Trap 2), turning Red into Blue Attested evidence. Notice self-approval
-              on `/review` is strictly blocked.
-            </p>
+        {/* Bottom Bar: Single Direct Link to Metrics */}
+        <div className="pt-4 border-t border-border-subtle/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2 text-text-muted">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>188 Automated Tests Verified • Zero Unapproved Disclosures</span>
           </div>
 
-          <div
-            onClick={() => switchRole("reviewer")}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              currentRole === "reviewer"
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-border-subtle bg-canvas hover:border-emerald-500/50"
-            }`}
+          <Link
+            href="/metrics"
+            className="text-accent-cyan hover:text-white font-bold flex items-center gap-1.5 group transition-colors"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-emerald-400">
-                2. Reviewer / Mentor (Prof. Deshmukh)
-              </span>
-              {currentRole === "reviewer" && (
-                <span className="text-[10px] text-emerald-400 font-bold">ACTIVE</span>
-              )}
-            </div>
-            <p className="text-text-secondary text-[11px] font-sans">
-              Test Stage 5 (`/review`) with full approval rights. Compare version diffs
-              (v1.0 vs. v1.1), inspect the Quarantine Vault (Trap 4 & 6), resolve the
-              deadline conflict (Trap 1), and approve v2.0.
-            </p>
-          </div>
-
-          <div
-            onClick={() => switchRole("incoming_lead")}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              currentRole === "incoming_lead"
-                ? "border-indigo-500 bg-indigo-500/10"
-                : "border-border-subtle bg-canvas hover:border-indigo-500/50"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-indigo-400">
-                3. Incoming Team Lead (Riya)
-              </span>
-              {currentRole === "incoming_lead" && (
-                <span className="text-[10px] text-indigo-400 font-bold">ACTIVE</span>
-              )}
-            </div>
-            <p className="text-text-secondary text-[11px] font-sans">
-              Test Stage 6 (`/handover`) with highest privileges. Inspect confidential
-              club budget figures (Trap 5), complete the 3-question quiz, and sign the
-              transfer receipt.
-            </p>
-          </div>
-
-          <div
-            onClick={() => switchRole("incoming_intern")}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              currentRole === "incoming_intern"
-                ? "border-cyan-500 bg-cyan-500/10"
-                : "border-border-subtle bg-canvas hover:border-cyan-500/50"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-cyan-400">4. Incoming Intern (Kabir)</span>
-              {currentRole === "incoming_intern" && (
-                <span className="text-[10px] text-cyan-400 font-bold">ACTIVE</span>
-              )}
-            </div>
-            <p className="text-text-secondary text-[11px] font-sans">
-              Test Stage 3 (`/draft`) and Stage 6 (`/handover`). Confidential finance
-              data (Trap 5) and mixed claims (Trap 8) are 100% withheld and replaced
-              with &quot;Restricted: request access&quot;.
-            </p>
-          </div>
+            <span>View 8 Planted Traps &amp; Evaluation Metrics (/metrics)</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
       </section>
     </main>
