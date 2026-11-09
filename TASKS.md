@@ -76,7 +76,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Parse uploaded or pre-seeded documents, Git repo exports, and chat/task exports into chunks, attach `allowed_roles` metadata, run `redaction.service` and `injection.service`, compute embeddings via Gemini `text-embedding-004` (with deterministic cached fallback), and store in database.
   - **Verify:** `POST /api/ingest` processes the `CampusConnect` sources and returns chunk counts, ACL map, quarantined secrets count, and injection warnings.
 
-- [ ] **TASK-011: Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (`/connect`)**
+- [x] **TASK-011: Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (`/connect`)**
   - **Files:** `src/app/connect/page.tsx`, `src/components/review/RedactionQuarantineTable.tsx`
   - **Scope:** Build the `/connect` page where users can load `CampusConnect` or upload custom exports, inspect the **Source Permission Scope Map** (confirming which folders/channels `Incoming Lead` vs. `Incoming Intern` can access), view the **Quarantined Secrets & Prompt-Injection Alerts**, and trigger reconstruction.
   - **Verify:** Page renders loading, empty, and populated states; displays Trap 4 (masked secrets) and Trap 6 (injection flag).

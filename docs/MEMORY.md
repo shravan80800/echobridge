@@ -28,11 +28,12 @@
 - [x] `TASK-008: Implement Secret & PII Redaction Engine (redaction.service.ts)` — Implemented regex and heuristic redaction for Stripe keys, generic API keys, Google API keys, GitHub tokens, Slack tokens, Bearer tokens, DB/passwords, international phone numbers, and emails in `src/services/ingestion/redaction.service.ts`. Generates masked previews (`sk_live_••••eyA9`), creates `QuarantinedSecret` records, prevents raw secret leakage into chunks or prompts, and logs security audit events. Verified with 8 unit tests in `tests/unit/redaction.test.ts`. All 50 tests passing.
 - [x] `TASK-009: Implement Prompt-Injection Detector & Stripper (injection.service.ts)` — Implemented detection of untrusted instruction override patterns (`ignore previous instructions`, `system override`, `disregard rubric`, `mark all claims corroborated`, `auto-approve all`, turn delimiters). Strips malicious spans from model-bound chunk text while preserving authentic engineering context, provides optional placeholder replacement mode, creates typed `QuarantinedSecret` records for the Quarantine Vault, and emits immutable `injection_flagged` audit events. Verified with 11 unit tests in `tests/unit/injection.test.ts` including end-to-end Planted Trap 6 verification. All 61 tests passing.
 - [x] `TASK-010: Build Source Parser, Chunker & /api/ingest Endpoint` — Implemented multi-modal source parser in `src/services/ingestion/parser.service.ts` supporting Markdown docs, chat exports, task boards, and confidential finance folders. Automatically enforces pre-model ACL scope isolation (restricting finance/confidential to `incoming_lead`). Integrated pre-embedding secret redaction and prompt-injection stripping. Built `src/lib/gemini/client.ts` with 768-dim `text-embedding-004` and deterministic normalized unit vector fallback. Implemented `GET` and `POST` `/api/ingest` route handlers. Verified with 14 unit tests across parser and API route suites. All 75 tests passing.
+- [x] `TASK-011: Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (/connect)` — Built `/connect` page with source inventory table, dynamic KPI counters, Source Permission Scope Map (highlighting Trap 1, 3, 4, 5, 6), `RedactionQuarantineTable` with category filters (Keys & Creds, PII, Injections), Pre-Model vs. Post-Generation RBAC architecture card, custom source ingestion modal, and one-click reconstruction trigger. Verified with unit tests in `tests/unit/quarantine-table.test.ts`. All 79 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-011`
-- **Task Name:** Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (`/connect`)
-- **Target Files:** `src/app/connect/page.tsx`, `src/components/review/RedactionQuarantineTable.tsx`
+- **Active Task ID:** `TASK-012`
+- **Task Name:** Implement Pre-Model & Post-Generation RBAC Guard (`rbac.service.ts`)
+- **Target Files:** `src/services/trust/rbac.service.ts`, `tests/unit/rbac.test.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -52,5 +53,5 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-011` (Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault on `/connect` and `RedactionQuarantineTable.tsx`).
+1. Execute `TASK-012` (Implement Pre-Model and Post-Generation RBAC Guards in `src/services/trust/rbac.service.ts` and test against Trap 5 and Trap 8 in `tests/unit/rbac.test.ts`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
