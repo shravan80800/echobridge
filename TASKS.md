@@ -17,7 +17,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Initialize Next.js with TypeScript, Tailwind CSS, `lucide-react`, `@google/genai`, `@supabase/supabase-js`, and `vitest` + `@playwright/test`. Add scripts: `dev`, `build`, `start`, `lint`, `typecheck` (`tsc --noEmit`), `test` (`vitest run`), and `test:e2e` (`playwright test`).
   - **Verify:** `npm run typecheck` and `npm run build` succeed cleanly.
 
-- [ ] **TASK-002: Configure Modern Tech Dark Theme & Typography (`DESIGN.md`)**
+- [x] **TASK-002: Configure Modern Tech Dark Theme & Typography (`DESIGN.md`)**
   - **Files:** `src/app/globals.css`, `src/app/layout.tsx`, `tailwind.config.ts`
   - **Scope:** Configure `Inter`/`Geist Sans` (`font-sans`) and `JetBrains Mono`/`Geist Mono` (`font-mono`). Define obsidian-slate background tokens (`#090D16`, `#111827`), `1px` translucent borders, Electric Indigo (`#6366F1`), Cyber Cyan (`#06B6D4`), and the 7 Evidence State color tokens (`Corroborated` Emerald, `Single-source` Amber, `Attested` Blue, `Stale` Orange, `Conflicting` Purple, `Unsupported` Rose Red, `Restricted` Slate).
   - **Verify:** Root layout renders with dark obsidian styling and crisp monospace metadata fonts.
