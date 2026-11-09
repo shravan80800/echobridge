@@ -31,20 +31,21 @@
 - [x] `TASK-011: Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (/connect)` — Built `/connect` page with source inventory table, dynamic KPI counters, Source Permission Scope Map (highlighting Trap 1, 3, 4, 5, 6), `RedactionQuarantineTable` with category filters (Keys & Creds, PII, Injections), Pre-Model vs. Post-Generation RBAC architecture card, custom source ingestion modal, and one-click reconstruction trigger. Verified with unit tests in `tests/unit/quarantine-table.test.ts`. All 79 tests passing.
 - [x] `TASK-012: Implement Pre-Model & Post-Generation RBAC Guard (rbac.service.ts)` — Built two-barrier confidentiality architecture in `src/services/trust/rbac.service.ts`: Barrier 1 (`filterChunksForAudience`) ensures chunks outside audience role (e.g. `CHK-08` Finance folder) never enter model prompt context for Intern; Barrier 2 (`enforcePostGenerationGuard`) calculates `audience_acl` as strict intersection of cited chunks, drops unauthorized claims from audience view, emits immutable `access_denied_guard` audit events, and substitutes zero-leak `"Restricted: request access"` placeholders (revealing 0 topics, titles, or source counts). Separation of duties check blocks departing member self-approval. Verified with 9 unit tests in `tests/unit/rbac.test.ts` (Trap 5 and Trap 8 verified). All 88 tests passing.
 - [x] `TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (verifier.service.ts)` — Implemented Layer A deterministic verbatim quote span checking (with whitespace normalization and coordinate extraction in `src/utils/text-matching.ts`) and Layer B semantic entailment judge (with contradiction detection and token overlap heuristic). Implemented strict Author Independence Rule (Proposal page 7): 2+ supporting chunks qualify as `corroborated` (Green) ONLY if authors differ and neither quotes/copies the other; same-author statements across chat and doc count as 1 source (`single_source` Yellow); derivative quoting counts as 1 source; gap answers transition to `attested` (Blue). Verified with 13 unit tests in `tests/unit/verifier.test.ts`. All 101 tests passing.
+- [x] `TASK-014: Implement Conflict Detector, Staleness Checker & Confidence Heuristic` — Built conflict detection engine in `src/services/trust/conflict.service.ts` detecting entity attribute contradictions (Trap 1: March 15 vs. March 20), formatting `conflict_pair` records for side-by-side comparison, and supporting Reviewer resolution. Built staleness evaluator in `src/utils/date-freshness.ts` comparing timestamps against the 180-day threshold (Trap 3: Runbook 9 months old). Implemented exact 4-part Confidence Score formula in `src/services/trust/confidence.service.ts` (0.40 coverage + 0.25 corroboration + 0.15 freshness + 0.20 conflict-free). Verified with 9 unit tests in `tests/unit/confidence.test.ts` (Trap 1 and Trap 3 verified). All 110 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-014`
-- **Task Name:** Implement Conflict Detector, Staleness Checker & Confidence Heuristic
-- **Target Files:** `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, `src/services/trust/confidence.service.ts`, `tests/unit/confidence.test.ts`
+- **Active Task ID:** `TASK-015`
+- **Task Name:** Implement Retrieve-Only Generator & `/api/reconstruct` Endpoint
+- **Target Files:** `src/services/trust/generator.service.ts`, `src/app/api/reconstruct/route.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
 
 | Trap # | Planted Trap Description | Target Service / UI | Current Status |
 | :--- | :--- | :--- | :--- |
-| **Trap 1** | Decision in chat (15 Mar) contradicted by planning doc (20 Mar) | `conflict.service.ts` $\rightarrow$ Purple `CONFLICTING` side-by-side card | `SEEDED` |
+| **Trap 1** | Decision in chat (15 Mar) contradicted by planning doc (20 Mar) | `conflict.service.ts` $\rightarrow$ Purple `CONFLICTING` side-by-side card | `VERIFIED` |
 | **Trap 2** | Key rationale for choosing Redis over Postgres exists nowhere | `interview.service.ts` $\rightarrow$ Red `UNSUPPORTED` $\rightarrow$ Blue `ATTESTED` | `SEEDED` |
-| **Trap 3** | Deployment Runbook last updated 9 months ago (>6m threshold) | `date-freshness.ts` $\rightarrow$ Orange `STALE` badge | `SEEDED` |
+| **Trap 3** | Deployment Runbook last updated 9 months ago (>6m threshold) | `date-freshness.ts` $\rightarrow$ Orange `STALE` badge | `VERIFIED` |
 | **Trap 4** | Hard-coded Stripe/SendGrid API key & personal phone number | `redaction.service.ts` $\rightarrow$ Masked in chunk, stored in Quarantine Vault | `VERIFIED` |
 | **Trap 5** | Confidential Finance Folder restricted to Team Lead role | `rbac.service.ts` $\rightarrow$ Absent from Intern view (`Restricted` placeholder) | `VERIFIED` |
 | **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `VERIFIED` |
@@ -55,6 +56,8 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
+1. Execute `TASK-015` (Implement Retrieve-Only Generator and `/api/reconstruct` endpoint).
+2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 1. Execute `TASK-014` (Implement Conflict Detector, Staleness Checker, and transparent 4-part Confidence Heuristic in `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, and `src/services/trust/confidence.service.ts`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 1. Execute `TASK-013` (Implement Two-Layer Citation Verifier and Author Independence Rule in `src/utils/text-matching.ts` and `src/services/trust/verifier.service.ts`).

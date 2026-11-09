@@ -99,7 +99,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     3. **Author Independence Rule:** Count supporting chunks as 2+ independent sources (`corroborated` Green) ONLY if `chunkA.author !== chunkB.author` AND neither chunk copies/quotes the other. Same-author chunks across chat + doc count as **1 source** (`single_source` Yellow).
   - **Verify:** Unit tests verify verbatim matching, hallucination rejection, and all 4 examples from the Independence Rule table on Page 7 of the Proposal.
 
-- [ ] **TASK-014: Implement Conflict Detector, Staleness Checker & Confidence Heuristic**
+- [x] **TASK-014: Implement Conflict Detector, Staleness Checker & Confidence Heuristic**
   - **Files:** `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, `src/services/trust/confidence.service.ts`, `tests/unit/confidence.test.ts`
   - **Scope:**
     1. Detect conflicting values for the same entity/attribute (Trap 1: March 15 vs. March 20) and format `conflict_pair_json` with both authors and timestamps (`conflicting` Purple).
