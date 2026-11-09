@@ -14,14 +14,15 @@ export function getSupabaseServerClient(): SupabaseClient | null {
   }
 
   if (!serverClient) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, "");
     const key =
       process.env.SUPABASE_SERVICE_ROLE_KEY &&
       !process.env.SUPABASE_SERVICE_ROLE_KEY.includes("your_supabase_service_role")
         ? process.env.SUPABASE_SERVICE_ROLE_KEY
         : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-    serverClient = createClient(url, key, {
+    serverClient = createClient(cleanUrl, key, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
