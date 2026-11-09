@@ -120,10 +120,10 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 5: Stage 4 — Targeted Gap-Interview & Sudden-Exit Fallback
 *Goal: Turn unwritten rationale (`Red Unsupported` and critical `Yellow Single-Source` gaps) into attributed `Blue Attested` evidence, or handle sudden exits gracefully.*
 
-- [ ] **TASK-017: Implement Gap-Interview Service & `/api/gap-interview` Endpoint**
+- [x] **TASK-017: Implement Gap-Interview Service & `/api/gap-interview` Endpoint**
   - **Files:** `src/services/workflow/interview.service.ts`, `src/app/api/gap-interview/route.ts`
   - **Scope:** Automatically generate 5 to 10 targeted interview questions for unsupported/single-source critical claims (including Trap 2: *"Why was Redis chosen over Postgres?"* and Trap 7: *"Who owns the domain renewal?"*). When the `departing_member` submits an answer, create `DraftVersion v1.1`, transition the answered claim to `attested` (Blue) with `answered_by` and `answered_at` metadata, and recalculate the Confidence Score. Support a **"Sudden Exit / Unavailable"** action that leaves unanswered gaps Red and assigns them to a named fallback contact.
-  - **Verify:** Submitting an answer to Trap 2 transitions the Redis rationale claim from `unsupported` (Red) in `v1.0` to `attested` (Blue) in `v1.1`, while never counting Blue as Green (`corroborated`).
+  - **Verify:** Submitting an answer to Trap 2 transitions the Redis rationale claim from `unsupported` (Red) in `v1.0` to `attested` (Blue) in `v1.1`, while never counting Blue as Green (`corroborated`). [Verified: 6/6 tests pass in `tests/unit/interview.test.ts`]
 
 - [ ] **TASK-018: Build Stage 4 UI — Targeted Gap-Interview Workspace (`/gap-interview`)**
   - **Files:** `src/app/gap-interview/page.tsx`, `src/components/interview/GapQuestionCard.tsx`, `src/components/interview/SuddenExitFallbackBanner.tsx`
