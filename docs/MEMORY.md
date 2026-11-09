@@ -38,11 +38,12 @@
 - [x] `TASK-018: Build Stage 4 UI — Targeted Gap-Interview Workspace (/interview & /gap-interview)` — Built Stage 4 terminal in `src/app/interview/page.tsx` and `src/app/gap-interview/page.tsx`: split-screen layout with filterable knowledge gap queue (All, Pending, Attested), `GapQuestionCard` with planted trap chips (Trap 2 & Trap 7), context alert, 1-click sample answer button for judges, Attested (Blue) attribution badge, `SuddenExitFallbackBanner` with faculty mentor assignment (Prof. Deshmukh), and Live Impact Preview comparing `v1.0 (76%)` to `v1.1 (84%)`. Verified with 5 unit tests in `tests/unit/interview-ui.test.ts`. All 131 tests passing.
 - [x] `TASK-019: Implement Review & Version Diff Service + /api/review Endpoint` — Built Stage 5 reviewer service in `src/services/workflow/review.service.ts` and `/api/review` endpoint: enforces strict Separation of Duties (ADR-007: departing member self-approval rejected with 403 Forbidden), claim mutations (`approve`, `edit`, `redact`, `reject`), side-by-side conflict resolver (Trap 1: March 15 vs. March 20 resolved to Side B), semantic version diff generator across `v1.0`, `v1.1`, and `v2.0`, and final handover publication creating `DraftVersion v2.0` (`status: 'approved'`). Verified with 13 unit tests in `tests/unit/review.test.ts`. All 144 tests passing.
 - [x] `TASK-020: Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (/review)` — Built Stage 5 Reviewer interface in `src/app/review/page.tsx` matching Proposal Figure 3: 3-column layout featuring Version History Rail (`v1.0`, `v1.1`, `v2.0`), Audience Scope Switcher (`Team Lead` vs `Intern`), `ConflictResolutionCard` for Trap 1 (1-click resolution to March 20th Planning Doc), `VersionDiffViewer` with red/green inline changes and confidence delta metrics, and `ClaimReviewActionPanel` enforcing Separation of Duties (ADR-007) with disabled controls for departing lead and active approval CTA for reviewer. Verified with 5 unit tests in `tests/unit/review-ui.test.ts`. All 149 tests passing.
+- [x] `TASK-021: Build Handover Delivery, Comprehension Check & /api/handover Endpoint` — Built Stage 6 recipient verification engine and delivery page: `src/services/workflow/receipt.service.ts`, `/api/receipt`, `/api/handover`, `src/app/handover/page.tsx`, `OnboardingBoard` (Day 1, Week 1, Month 1 continuation plan with pinned operational risk callouts), `ComprehensionQuizModal` (evaluating 3 critical project risk questions covering Trap 1, 2, and 3 with anti-blind click enforcement >= 67%), cryptographic SHA-256 `receipt_hash` signing, and printable `ReceiptCertificateModal`. Verified with 10 unit tests in `tests/unit/receipt.test.ts` and 5 unit tests in `tests/unit/handover-ui.test.ts`. All 164 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-021`
-- **Task Name:** Implement Handover Receipt & Comprehension Service + `/api/receipt` Endpoint
-- **Target Files:** `src/services/workflow/receipt.service.ts`, `src/app/api/receipt/route.ts`
+- **Active Task ID:** `TASK-022`
+- **Task Name:** Build Live Calibration, Metrics & 8-Trap Verification Scorecard (`/metrics`)
+- **Target Files:** `src/app/metrics/page.tsx`, `src/components/metrics/TrapScorecardTable.tsx`, `src/components/metrics/QualityMetricsGauge.tsx`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -62,6 +63,6 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-021` (Implement Handover Receipt & Comprehension Check Service in `src/services/workflow/receipt.service.ts` and `src/app/api/receipt/route.ts`).
+1. Execute `TASK-022` (Build Live Calibration, Metrics & 8-Trap Verification Scorecard on `/metrics`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

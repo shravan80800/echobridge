@@ -352,6 +352,7 @@ export interface Receipt {
   comprehension_passed: boolean;
   answers?: ReceiptAnswer[];
   acknowledged_at: string;
+  receipt_hash?: string;
 }
 
 // ============================================================================

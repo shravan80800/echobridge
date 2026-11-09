@@ -149,13 +149,13 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 7: Stage 6 — Role-Appropriate Handover, Onboarding Plan & Comprehension Receipt
 *Goal: Deliver the approved, role-scoped handover with a cited Day 1 / Week 1 / Month 1 continuation plan, critical risk comprehension check, and verified transfer receipt.*
 
-- [ ] **TASK-021: Build Handover Delivery, Comprehension Check & `/api/handover` Endpoint**
-  - **Files:** `src/app/api/handover/route.ts`, `src/app/handover/page.tsx`, `src/components/handover/OnboardingTimeline.tsx`, `src/components/handover/ComprehensionQuizModal.tsx`, `src/components/handover/ReceiptBanner.tsx`
+- [x] **TASK-021: Build Handover Delivery, Comprehension Check & `/api/handover` Endpoint**
+  - **Files:** `src/app/api/handover/route.ts`, `src/app/api/receipt/route.ts`, `src/services/workflow/receipt.service.ts`, `src/app/handover/page.tsx`, `src/components/handover/OnboardingBoard.tsx`, `src/components/handover/ComprehensionQuizModal.tsx`, `src/components/handover/ReceiptBanner.tsx`, `src/components/handover/ReceiptCertificateModal.tsx`
   - **Scope:** Build the `/handover` page matching Concept Mockup Figure 7 of the Proposal:
     - Top `ReceiptBanner` (`Receipt: not yet acknowledged` $\rightarrow$ `Verified Transfer Acknowledged by [Name] at [Timestamp]`).
     - 3-Column cited continuation board: **Day 1** (Read architecture overview, Meet project mentor), **Week 1** (Review open PRs, Rotate API keys), **Month 1** (Plan next release, Resolve open conflicts), plus pinned **Open Risk Callout** (`🚩 Open risk: API rate limits / DB connection pool`).
-    - Interactive **Comprehension Check Modal** requiring the incoming member to answer 3 role-specific verification questions on critical project risks before recording the signed `Receipt`.
-  - **Verify:** Viewing `/handover` as `Incoming Team Lead` shows full approved scope; viewing as `Incoming Intern` hides finance claims and shows only permitted items + optional `"Restricted: request access"` card.
+    - Interactive **Comprehension Check Modal** requiring the incoming member to answer 3 role-specific verification questions on critical project risks before recording the signed `Receipt` with cryptographic SHA-256 digital signature hash.
+  - **Verify:** Viewing `/handover` as `Incoming Team Lead` shows full approved scope; viewing as `Incoming Intern` hides finance claims and shows only permitted items + optional `"Restricted: request access"` card. [Verified: 10/10 tests pass in `tests/unit/receipt.test.ts`, 5/5 in `tests/unit/handover-ui.test.ts`]
 
 ## Phase 8: Metrics Calibration Dashboard, Stretch Graph & E2E Verification
 *Goal: Expose an honest live scorecard proving all 8 planted traps and target metrics from Section 10 of the Proposal, add the interactive Context Graph, and pass all Playwright E2E checks.*
