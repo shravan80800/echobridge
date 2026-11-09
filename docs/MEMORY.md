@@ -33,11 +33,12 @@
 - [x] `TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (verifier.service.ts)` — Implemented Layer A deterministic verbatim quote span checking (with whitespace normalization and coordinate extraction in `src/utils/text-matching.ts`) and Layer B semantic entailment judge (with contradiction detection and token overlap heuristic). Implemented strict Author Independence Rule (Proposal page 7): 2+ supporting chunks qualify as `corroborated` (Green) ONLY if authors differ and neither quotes/copies the other; same-author statements across chat and doc count as 1 source (`single_source` Yellow); derivative quoting counts as 1 source; gap answers transition to `attested` (Blue). Verified with 13 unit tests in `tests/unit/verifier.test.ts`. All 101 tests passing.
 - [x] `TASK-014: Implement Conflict Detector, Staleness Checker & Confidence Heuristic` — Built conflict detection engine in `src/services/trust/conflict.service.ts` detecting entity attribute contradictions (Trap 1: March 15 vs. March 20), formatting `conflict_pair` records for side-by-side comparison, and supporting Reviewer resolution. Built staleness evaluator in `src/utils/date-freshness.ts` comparing timestamps against the 180-day threshold (Trap 3: Runbook 9 months old). Implemented exact 4-part Confidence Score formula in `src/services/trust/confidence.service.ts` (0.40 coverage + 0.25 corroboration + 0.15 freshness + 0.20 conflict-free). Verified with 9 unit tests in `tests/unit/confidence.test.ts` (Trap 1 and Trap 3 verified). All 110 tests passing.
 - [x] `TASK-015: Implement Retrieve-Only Generator & /api/reconstruct Endpoint` — Orchestrated the complete Stage 3 Trust Pipeline in `src/services/trust/generator.service.ts`: applies Barrier 1 Pre-Model RBAC, retrieve-only Gemini 2.5 Flash / benchmark generation with XML delimited `<chunk>` blocks and `"insufficient_evidence"` fallback for unknown domains (Trap 7), two-layer citation verifier, conflict and staleness detection (Trap 1 & 3), Barrier 2 Post-Generation RBAC guard (Trap 5 & 8), transparent 4-part Confidence Score computation, persistence of `DraftVersion v1.0` and claims to database repository, and immutable `draft_generated` audit logging. Built `GET` and `POST` `/api/reconstruct` route handlers. Verified with 5 unit tests in `tests/unit/generator.test.ts`. All 115 tests passing.
+- [x] `TASK-016: Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (/draft)` — Built `/draft` page featuring the transparent `ConfidenceScoreCard` HUD with 4 progress bars, audience view switcher (`Team Lead View` vs `Intern View` with dynamic permission pills), filterable atomic `ClaimCard` list with 4px left-border EvidenceState colors, two-column side-by-side Purple conflict matrix, zero-leak restricted placeholders in Intern view (Trap 5 & 8), evaluator real-time trap detection checklist, and interactive `SourceCitationPopover` highlighting exact verbatim quotes inside chunk context with Layer A & B status badges. Verified with 5 unit tests in `tests/unit/draft-ui.test.ts`. All 120 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-016`
-- **Task Name:** Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (`/draft`)
-- **Target Files:** `src/app/draft/page.tsx`, `src/components/evidence/ConfidenceScoreCard.tsx`, `src/components/evidence/ClaimCard.tsx`, `src/components/evidence/SourceCitationPopover.tsx`
+- **Active Task ID:** `TASK-017`
+- **Task Name:** Implement Gap-Interview Service & `/api/gap-interview` Endpoint
+- **Target Files:** `src/services/workflow/interview.service.ts`, `src/app/api/gap-interview/route.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -55,6 +56,10 @@
 
 ## 6. Known Issues & Blockers
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
+
+## 7. Next Step
+1. Execute `TASK-017` (Implement Gap-Interview Service and `/api/gap-interview` route handler).
+2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 
 ## 7. Next Step
 1. Execute `TASK-016` (Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover, and Confidence Score HUD on `/draft`).

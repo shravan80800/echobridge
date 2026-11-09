@@ -112,7 +112,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Orchestrate the full Stage 3 pipeline separately for `incoming_lead` and `incoming_intern`: run Pre-Model RBAC filter $\rightarrow$ Retrieve-only Gemini generation (`gemini-2.5-flash`, `temperature: 0`, delimited `<chunk>` blocks, `"insufficient_evidence"` fallback) $\rightarrow$ Two-Layer Citation Verifier $\rightarrow$ Conflict & Staleness Detector $\rightarrow$ Post-Generation Guard $\rightarrow$ Save `DraftVersion v1.0`.
   - **Verify:** Calling `POST /api/reconstruct` produces separate `v1.0` drafts for Team Lead and Intern with all 8 planted traps accurately classified.
 
-- [ ] **TASK-016: Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (`/draft`)**
+- [x] **TASK-016: Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (`/draft`)**
   - **Files:** `src/app/draft/page.tsx`, `src/components/evidence/ConfidenceScoreCard.tsx`, `src/components/evidence/ClaimCard.tsx`, `src/components/evidence/SourceCitationPopover.tsx`
   - **Scope:** Build `/draft` displaying the **Confidence Score HUD** (with its 4 transparent component bars), audience view switcher (`Team Lead View` vs. `Intern View`), filterable `ClaimCard` list (filter by Evidence State or Section), side-by-side Purple conflict display, and interactive `[🔗 Source]` popover highlighting the exact verbatim `quoted_span` inside the chunk.
   - **Verify:** Users can inspect every claim's verbatim quote, toggle between Team Lead and Intern views, and see `"Restricted: request access"` placeholders in the Intern view.
