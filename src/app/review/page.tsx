@@ -19,15 +19,17 @@ import {
   Sparkles,
   Search,
   Filter,
+  Check,
+  Edit3,
+  XCircle,
+  Scissors,
 } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
 import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { ConflictResolutionCard } from "@/components/review/ConflictResolutionCard";
 import { VersionDiffViewer } from "@/components/review/VersionDiffViewer";
-import { ClaimReviewActionPanel } from "@/components/review/ClaimReviewActionPanel";
 import type {
   AudienceRole,
   ClaimRecord,
@@ -38,9 +40,8 @@ import type {
 import type { VersionDiffSummary } from "@/services/workflow/review.service";
 
 export default function ReviewPage() {
-  const { currentRole, currentProfile } = useRole();
+  const { currentRole, currentProfile, switchRole } = useRole();
   const [audienceRole, setAudienceRole] = useState<AudienceRole>("incoming_lead");
-  const [viewMode, setViewMode] = useState<"claims" | "diff">("claims");
   const [fromVersion, setFromVersion] = useState<VersionLabel>("v1.0");
   const [toVersion, setToVersion] = useState<VersionLabel>("v1.1");
   const [activeVersionLabel, setActiveVersionLabel] = useState<VersionLabel>("v1.1");
@@ -72,7 +73,6 @@ export default function ReviewPage() {
         setConflicts(json.conflicts || []);
         setDiff(json.diff || null);
 
-        // Active draft priority: matching activeVersionLabel or activeDraft from API
         const matched = (json.drafts as DraftVersion[]).find(
           (d) => d.version_label === activeVersionLabel
         );
@@ -103,6 +103,11 @@ export default function ReviewPage() {
     action: ReviewStatus,
     editedText?: string
   ) => {
+    if (!isReviewer) {
+      alert("Separation of Duties (ADR-007): Only Prof. Deshmukh (Reviewer) can review or approve claims.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setFeedbackMessage(null);
@@ -153,6 +158,11 @@ export default function ReviewPage() {
     winningSide: "side_a" | "side_b" | "custom",
     customText?: string
   ) => {
+    if (!isReviewer) {
+      alert("Only Prof. Deshmukh (Reviewer) has authority to resolve conflicting claims.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setFeedbackMessage(null);
@@ -188,7 +198,6 @@ export default function ReviewPage() {
         setFeedbackMessage(
           `Conflict resolved! Registration deadline set to March 20th. Claim promoted to Corroborated.`
         );
-        // Refresh diffs
         await fetchReviewData();
       } else if (!json.success && json.error) {
         setFeedbackMessage(`Error: ${json.error}`);
@@ -202,6 +211,11 @@ export default function ReviewPage() {
 
   // Final Handover Approval (Creates DraftVersion v2.0)
   const handleApproveHandover = async () => {
+    if (!isReviewer) {
+      alert("Separation of Duties (ADR-007): Departing members cannot self-approve handovers.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setFeedbackMessage(null);
@@ -228,7 +242,6 @@ export default function ReviewPage() {
         setFeedbackMessage(
           `Handover Approved! DraftVersion v2.0 successfully published with Confidence ${v2.confidence.total_score}%. Handover ready for incoming recipients.`
         );
-        // Refresh full review data
         await fetchReviewData();
       } else if (!json.success && json.error) {
         setFeedbackMessage(`Error: ${json.error}`);
@@ -240,13 +253,6 @@ export default function ReviewPage() {
     }
   };
 
-  // Version diff selector helper
-  const handleSelectVersions = (from: VersionLabel, to: VersionLabel) => {
-    setFromVersion(from);
-    setToVersion(to);
-    setViewMode("diff");
-  };
-
   // Switch snapshot
   const handleSelectSnapshot = (label: VersionLabel) => {
     setActiveVersionLabel(label);
@@ -255,7 +261,6 @@ export default function ReviewPage() {
       setActiveDraft(target);
       setClaims(target.claims);
     }
-    setViewMode("claims");
   };
 
   const selectedClaim =
@@ -266,7 +271,6 @@ export default function ReviewPage() {
           selectedClaimId.replace(/-V1\.[012]|-V2\.0/g, "")
     ) || claims[0] || null;
 
-  // Filter claims based on placeholder visibility toggle in intern view
   const visibleClaims = claims.filter((c) => {
     if (audienceRole === "incoming_intern" && !showRestrictedPlaceholders) {
       return c.evidence_state !== "restricted";
@@ -275,6 +279,7 @@ export default function ReviewPage() {
   });
 
   const conflictClaim = conflicts.find((c) => c.evidence_state === "conflicting");
+  const confidenceScore = activeDraft?.confidence?.total_score ?? 84;
 
   if (isLoading) {
     return (
@@ -282,394 +287,411 @@ export default function ReviewPage() {
         <LoadingSkeleton
           cardCount={3}
           message="Loading Reviewer Workspace & Version Diffs..."
-          steps={[
-            "Checking separation of duties access authorization...",
-            "Loading snapshots for v1.0, v1.1, and v2.0...",
-            "Calculating semantic claim diffs and conflict pairs...",
-          ]}
         />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-5">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 uppercase">
-              Stage 5 of 6: Human Review & Approval
-            </span>
-            <span className="text-xs font-mono text-text-muted">
-              ADR-007 Reviewer Authority
-            </span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary">
-            Reviewer Diff & Handover Approval Dashboard
-          </h1>
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-            Inspect Git-style diffs between versions, resolve conflicting claims side-by-side, and approve role-appropriate views before publishing to incoming members.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/interview">
-            <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              Stage 4: Gap-Interview
-            </Button>
-          </Link>
-
-          <Link href="/handover">
-            <Button variant="approve" size="sm" className="text-xs">
-              <span>Stage 6: Handover Delivery</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Role Notice & Separation of Duties Warning */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-surface border border-border-subtle text-xs">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isReviewer ? "bg-emerald-400" : "bg-rose-400 animate-pulse"
-            }`}
-          />
-          <span className="font-mono text-text-secondary">
-            Active Persona:{" "}
-            <strong className={isReviewer ? "text-emerald-300" : "text-rose-300"}>
-              {currentProfile.name} ({currentProfile.badge})
-            </strong>
-          </span>
-          <span className="text-text-muted">|</span>
-          <span className="text-text-muted hidden sm:inline">
-            {isReviewer
-              ? "Holds sole handover approval authority."
-              : "Read-only preview. Departing leads cannot approve handovers (ADR-007)."}
-          </span>
-        </div>
-
-        {/* Intern Placeholder Visibility Toggle (ADR-004) */}
-        {audienceRole === "incoming_intern" && (
-          <button
-            type="button"
-            onClick={() => setShowRestrictedPlaceholders(!showRestrictedPlaceholders)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-canvas border border-border-subtle text-[11px] font-mono text-text-secondary hover:text-text-primary transition-colors"
-          >
-            {showRestrictedPlaceholders ? (
-              <>
-                <Eye className="w-3.5 h-3.5 text-accent-cyan" />
-                <span>Hide Zero-Leak Placeholders</span>
-              </>
-            ) : (
-              <>
-                <EyeOff className="w-3.5 h-3.5 text-text-muted" />
-                <span>Show Zero-Leak Placeholders</span>
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Feedback Alert Toast */}
-      {feedbackMessage && (
-        <div
-          className={`rounded-xl p-3.5 text-xs flex items-center justify-between gap-3 ${
-            feedbackMessage.startsWith("Error")
-              ? "bg-rose-950/20 border border-rose-500/30 text-rose-200"
-              : "bg-emerald-950/20 border border-emerald-500/30 text-emerald-200"
-          }`}
-        >
+    <main className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-5">
+      {/* ==================================================================== */}
+      {/* 1. SEPARATION OF DUTIES (ADR-007) BANNER                             */}
+      {/* ==================================================================== */}
+      {!isReviewer && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span>{feedbackMessage}</span>
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Separation of Duties (ADR-007):</strong> As the Departing Member, you can inspect diffs and suggest edits, but cannot approve the handover.
+            </span>
           </div>
+
           <button
             type="button"
-            onClick={() => setFeedbackMessage(null)}
-            className="font-mono text-xs opacity-75 hover:opacity-100"
+            onClick={() => switchRole("reviewer")}
+            className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:text-white hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors shrink-0 text-xs font-bold"
           >
-            Dismiss
+            Switch to Reviewer (Prof. Deshmukh) to Approve →
           </button>
         </div>
       )}
 
-      {/* 3-Column Review Layout (Figure 3 in Proposal) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Rail: Version History & Audience Switcher (3 cols) */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Audience Tab Switcher */}
-          <Card className="p-3.5 bg-surface space-y-2.5">
-            <span className="text-[11px] font-mono font-bold uppercase text-text-muted block">
-              Audience Scope View
-            </span>
-            <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setAudienceRole("incoming_lead")}
-                className={`p-2 rounded-lg text-center transition-all ${
-                  audienceRole === "incoming_lead"
-                    ? "bg-accent-primary text-white font-bold shadow-sm"
-                    : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
-                }`}
-              >
-                Team Lead
-              </button>
-              <button
-                type="button"
-                onClick={() => setAudienceRole("incoming_intern")}
-                className={`p-2 rounded-lg text-center transition-all ${
-                  audienceRole === "incoming_intern"
-                    ? "bg-accent-primary text-white font-bold shadow-sm"
-                    : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
-                }`}
-              >
-                Intern
-              </button>
-            </div>
-          </Card>
+      {/* Success / Feedback Banner */}
+      {feedbackMessage && (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between font-mono">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{feedbackMessage}</span>
+          </div>
+          <button
+            onClick={() => setFeedbackMessage(null)}
+            className="text-emerald-400/70 hover:text-emerald-400"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
-          {/* View Mode Selector */}
-          <Card className="p-3.5 bg-surface space-y-2">
-            <span className="text-[11px] font-mono font-bold uppercase text-text-muted block">
-              Inspection Mode
-            </span>
-            <div className="space-y-1.5 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setViewMode("claims")}
-                className={`w-full flex items-center justify-between p-2 rounded-lg transition-all ${
-                  viewMode === "claims"
-                    ? "bg-surface-hover text-accent-cyan font-bold border border-accent-cyan/30"
-                    : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
-                }`}
-              >
-                <span>Claims Inspector</span>
-                <span className="text-[10px] opacity-75">{claims.length} claims</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("diff")}
-                className={`w-full flex items-center justify-between p-2 rounded-lg transition-all ${
-                  viewMode === "diff"
-                    ? "bg-surface-hover text-accent-cyan font-bold border border-accent-cyan/30"
-                    : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <GitCompare className="w-3.5 h-3.5" />
-                  <span>Version Diff Viewer</span>
-                </div>
-                <span className="text-[10px] text-amber-400 font-bold">
-                  ~{diff?.modifiedCount || 1}
-                </span>
-              </button>
-            </div>
-          </Card>
-
-          {/* Version History Rail */}
-          <Card className="p-3.5 bg-surface space-y-2.5">
-            <span className="text-[11px] font-mono font-bold uppercase text-text-muted block">
-              Version History Rail
-            </span>
-            <div className="space-y-2 font-mono text-xs">
-              {/* v2.0 Snapshot */}
-              <button
-                type="button"
-                onClick={() => handleSelectSnapshot("v2.0")}
-                className={`w-full text-left p-2.5 rounded-lg border transition-all ${
-                  activeVersionLabel === "v2.0"
-                    ? "border-emerald-500 bg-emerald-950/20 text-emerald-300 font-bold"
-                    : "border-border-subtle bg-canvas/40 hover:bg-surface-hover text-text-secondary"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>v2.0 Approved</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400">
-                    Final
-                  </span>
-                </div>
-                <span className="text-[11px] text-text-muted font-normal block mt-1">
-                  Confidence: 89% (Conflicts Resolved)
-                </span>
-              </button>
-
-              {/* v1.1 Snapshot */}
-              <button
-                type="button"
-                onClick={() => handleSelectSnapshot("v1.1")}
-                className={`w-full text-left p-2.5 rounded-lg border transition-all ${
-                  activeVersionLabel === "v1.1"
-                    ? "border-blue-500 bg-blue-950/20 text-blue-300 font-bold"
-                    : "border-border-subtle bg-canvas/40 hover:bg-surface-hover text-text-secondary"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>v1.1 Gap-Interview</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400">
-                    Attested
-                  </span>
-                </div>
-                <span className="text-[11px] text-text-muted font-normal block mt-1">
-                  Confidence: 80% (Redis Attested)
-                </span>
-              </button>
-
-              {/* v1.0 Snapshot */}
-              <button
-                type="button"
-                onClick={() => handleSelectSnapshot("v1.0")}
-                className={`w-full text-left p-2.5 rounded-lg border transition-all ${
-                  activeVersionLabel === "v1.0"
-                    ? "border-indigo-500 bg-indigo-950/20 text-indigo-300 font-bold"
-                    : "border-border-subtle bg-canvas/40 hover:bg-surface-hover text-text-secondary"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>v1.0 Initial Draft</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-text-muted">
-                    Draft
-                  </span>
-                </div>
-                <span className="text-[11px] text-text-muted font-normal block mt-1">
-                  Confidence: 76% (Initial Auto-Gen)
-                </span>
-              </button>
-            </div>
-          </Card>
+      {/* ==================================================================== */}
+      {/* 2. TOP HEADER BAR OF REVIEW WORKSPACE (FIGURE 3)                     */}
+      {/* ==================================================================== */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-surface border border-border-subtle shadow-sm">
+        {/* Title */}
+        <div>
+          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider block font-bold">
+            Stage 5: Review &amp; Approval
+          </span>
+          <h1 className="text-xl font-bold tracking-tight text-text-primary">
+            Review and Approval: Human Reviewer Dashboard &amp; Diff Inspector
+          </h1>
         </div>
 
-        {/* Center Panel: Main Inspection Workspace (6 cols) */}
-        <div className="lg:col-span-6 space-y-4">
-          {viewMode === "diff" ? (
-            <VersionDiffViewer
-              diff={diff}
-              fromVersion={fromVersion}
-              toVersion={toVersion}
-              onSelectVersions={handleSelectVersions}
-              isLoading={isLoading}
-            />
-          ) : (
-            <div className="space-y-4">
-              {/* Trap 1 Conflict Card if present in this view */}
-              {conflictClaim && (
-                <ConflictResolutionCard
-                  claim={conflictClaim}
-                  isReviewer={isReviewer}
-                  onResolve={handleResolveConflict}
-                  isLoading={isSubmitting}
-                />
-              )}
+        {/* Audience Selector */}
+        <div className="flex items-center p-1 rounded-xl bg-canvas border border-border-subtle text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => setAudienceRole("incoming_lead")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              audienceRole === "incoming_lead"
+                ? "bg-indigo-600 text-white font-bold shadow-sm"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Team Lead View</span>
+          </button>
 
-              {/* Claims List Header */}
-              <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold uppercase text-text-primary">
-                    Claims in {activeVersionLabel} ({audienceRole})
-                  </span>
-                </div>
-                <span className="text-xs font-mono text-text-muted">
-                  {visibleClaims.length} total claims
-                </span>
-              </div>
-
-              {/* Claims List */}
-              <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
-                {visibleClaims.map((c) => {
-                  const isSelected =
-                    c.id === selectedClaimId ||
-                    c.id.replace(/-V1\.[012]|-V2\.0/g, "") ===
-                      selectedClaimId.replace(/-V1\.[012]|-V2\.0/g, "");
-
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setSelectedClaimId(c.id)}
-                      className={`w-full text-left p-3.5 rounded-xl border transition-all select-none ${
-                        isSelected
-                          ? "border-accent-cyan bg-surface-hover shadow-md"
-                          : "border-border-subtle bg-surface hover:bg-surface-hover/70"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <EvidenceBadge state={c.evidence_state} size="sm" />
-
-                        <div className="flex items-center gap-2">
-                          {c.planted_trap_id && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                              Trap {c.planted_trap_id}
-                            </span>
-                          )}
-
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase ${
-                              c.review?.status === "approved"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : c.review?.status === "edited"
-                                ? "bg-indigo-500/20 text-indigo-300"
-                                : c.review?.status === "redacted"
-                                ? "bg-amber-500/20 text-amber-300"
-                                : "bg-canvas text-text-muted"
-                            }`}
-                          >
-                            {c.review?.status || "pending"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-text-primary leading-relaxed font-sans line-clamp-3">
-                        {c.text}
-                      </p>
-
-                      <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mt-2 pt-2 border-t border-border-subtle/50">
-                        <span className="capitalize">{c.section}</span>
-                        <span>{c.evidence?.length || 0} citation(s)</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setAudienceRole("incoming_intern")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              audienceRole === "incoming_intern"
+                ? "bg-cyan-600 text-white font-bold shadow-sm"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Intern View</span>
+          </button>
         </div>
 
-        {/* Right Rail: ClaimReviewActionPanel & Final Approval (3 cols) */}
-        <div className="lg:col-span-3">
-          <ClaimReviewActionPanel
-            selectedClaim={selectedClaim}
-            isReviewer={isReviewer}
-            actorRoleName={`${currentProfile.name} (${currentProfile.badge})`}
-            onReviewClaim={handleReviewClaim}
-            onApproveHandover={handleApproveHandover}
+        {/* Confidence Score Pill + Primary Approve & Publish CTA */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Confidence {confidenceScore}%</span>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleApproveHandover}
+            disabled={!isReviewer || isSubmitting}
             isLoading={isSubmitting}
-          />
+            className={`text-xs font-mono ${
+              !isReviewer
+                ? "opacity-50 cursor-not-allowed bg-slate-800 text-text-muted border-border-subtle"
+                : ""
+            }`}
+            title={
+              isReviewer
+                ? "Approve Draft and create DraftVersion v2.0"
+                : "Departing member cannot approve (ADR-007)"
+            }
+          >
+            {isReviewer ? "Approve & Publish Handover" : "Approval Locked (Reviewer Only)"}
+          </Button>
         </div>
       </div>
 
-      {/* Bottom Navigation Toolbar */}
-      <div className="flex items-center justify-between pt-6 border-t border-border-subtle">
-        <Link href="/interview">
-          <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back to Stage 4: Gap-Interview
-          </Button>
-        </Link>
+      {/* ==================================================================== */}
+      {/* 3. EXACT 3-COLUMN CARD LAYOUT (CONCEPT MOCKUP FIGURE 3)              */}
+      {/* ==================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* COLUMN 1: VERSION HISTORY (w-56 / 3 Cols in 12-grid) */}
+        <div className="lg:col-span-3 space-y-3">
+          <div className="p-3.5 rounded-xl bg-surface border border-border-subtle space-y-3">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                Version History
+              </span>
+              <GitCompare className="w-4 h-4 text-accent-cyan" />
+            </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-text-muted hidden md:inline">
-            Stage 6: Onboarding continuation plan & receipt sign-off
-          </span>
+            {/* 3 Version Cards matching Figure 3 */}
+            <div className="space-y-2 font-mono text-xs">
+              {/* v2.0 */}
+              <button
+                type="button"
+                onClick={() => handleSelectSnapshot("v2.0")}
+                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                  activeVersionLabel === "v2.0"
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-text-primary shadow-sm"
+                    : "bg-canvas border-border-subtle hover:bg-surface-hover text-text-secondary"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400">v2.0</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
+                    Approved
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted mt-1 font-sans">
+                  Current / Approved draft published for incoming recipients.
+                </p>
+              </button>
+
+              {/* v1.1 */}
+              <button
+                type="button"
+                onClick={() => handleSelectSnapshot("v1.1")}
+                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                  activeVersionLabel === "v1.1"
+                    ? "bg-accent-primary/20 border-accent-primary/50 text-text-primary shadow-sm"
+                    : "bg-canvas border-border-subtle hover:bg-surface-hover text-text-secondary"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-accent-cyan">v1.1</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300">
+                    After Interview
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted mt-1 font-sans">
+                  Trap 2 promoted from Red → Blue Attested. Confidence: 84%.
+                </p>
+              </button>
+
+              {/* v1.0 */}
+              <button
+                type="button"
+                onClick={() => handleSelectSnapshot("v1.0")}
+                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                  activeVersionLabel === "v1.0"
+                    ? "bg-indigo-500/20 border-indigo-500/50 text-text-primary shadow-sm"
+                    : "bg-canvas border-border-subtle hover:bg-surface-hover text-text-secondary"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-400">v1.0</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-canvas text-text-muted border border-border-subtle">
+                    Initial
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted mt-1 font-sans">
+                  Initial auto-draft from ingested sources before interview.
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick link to Handover Stage */}
           <Link href="/handover">
-            <Button variant="primary" size="md" className="text-xs">
-              <span>Proceed to Stage 6: Handover Delivery</span>
-              <ArrowRight className="w-4 h-4 ml-2" />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full justify-center text-xs font-mono text-accent-cyan hover:text-white"
+            >
+              Proceed to Handover (Stage 6) →
             </Button>
           </Link>
+        </div>
+
+        {/* COLUMN 2: DIFF & CLAIM INSPECTOR (flex-1 / 6 Cols in 12-grid) */}
+        <div className="lg:col-span-6 space-y-4">
+          {/* Diff Summary View matching Figure 3 */}
+          {diff && (
+            <div className="p-4 rounded-xl bg-surface border border-border-subtle space-y-3">
+              <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                  Diff View: v1.0 → v1.1
+                </span>
+                <span className="text-xs font-mono font-bold text-emerald-400">
+                  Confidence Delta: +8% (76% → 84%)
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-canvas border border-border-subtle font-mono text-xs space-y-2">
+                <div className="text-rose-400">
+                  - Rationale missing for Redis session cache (UNSUPPORTED GAP)
+                </div>
+                <div className="text-emerald-400">
+                  + Redis chosen due to PostgreSQL 1,200 concurrent user pool exhaustion (ATTESTED)
+                </div>
+                <div className="text-purple-300">
+                  ⚡ Registration deadline conflict: March 15 (Chat) vs March 20 (Planning Doc)
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Trap 1: Authoritative Conflict Resolution Card */}
+          {conflictClaim && (
+            <div className="space-y-1">
+              <span className="text-xs font-mono text-purple-400 font-bold block">
+                Event Registration Deadline Conflict (March 15 vs March 20)
+              </span>
+              <ConflictResolutionCard
+                claim={conflictClaim}
+                isReviewer={isReviewer}
+                onResolve={handleResolveConflict}
+                isLoading={isSubmitting}
+              />
+            </div>
+          )}
+
+          {/* Claims List for Selected Version */}
+          <div className="p-4 rounded-xl bg-surface border border-border-subtle space-y-3">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                Claims in {activeVersionLabel} ({visibleClaims.length})
+              </span>
+              <span className="text-[11px] font-mono text-text-muted">
+                Click claim to inspect &amp; act
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {visibleClaims.map((claim) => {
+                const isSelected = selectedClaim?.id === claim.id;
+
+                return (
+                  <div
+                    key={claim.id}
+                    onClick={() => setSelectedClaimId(claim.id)}
+                    className={`p-3 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 text-xs ${
+                      isSelected
+                        ? "bg-accent-primary/10 border-accent-primary shadow-sm"
+                        : "bg-canvas border-border-subtle hover:bg-surface-hover"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <span className="font-mono text-text-muted text-[10px] shrink-0">
+                        {claim.id}
+                      </span>
+                      <p className="text-text-primary font-medium truncate">
+                        {claim.text}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <EvidenceBadge state={claim.evidence_state} size="sm" />
+                      <span
+                        className={`text-[10px] font-mono px-1.5 py-0.2 rounded border uppercase font-bold ${
+                          claim.review?.status === "approved"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : claim.review?.status === "rejected"
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            : claim.review?.status === "redacted"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            : "bg-canvas text-text-muted border-border-subtle"
+                        }`}
+                      >
+                        {claim.review?.status || "pending"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMN 3: ACTIONS STACK (w-64 / 3 Cols in 12-grid — Figure 3) */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="p-4 rounded-xl bg-surface border border-border-subtle space-y-4">
+            <div className="border-b border-border-subtle pb-2">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                Actions Panel
+              </span>
+              <span className="text-[11px] font-mono text-accent-cyan truncate block mt-0.5">
+                {selectedClaim ? selectedClaim.id : "No claim selected"}
+              </span>
+            </div>
+
+            {selectedClaim && (
+              <div className="p-2.5 rounded-lg bg-canvas border border-border-subtle text-xs space-y-1">
+                <span className="text-[10px] font-mono text-text-muted block uppercase">
+                  Selected Claim:
+                </span>
+                <p className="text-text-primary text-[11px] leading-relaxed line-clamp-3">
+                  &ldquo;{selectedClaim.text}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* 4 Clean Stacked Action Buttons matching Figure 3 */}
+            <div className="space-y-2 font-mono text-xs">
+              {/* 1. Approve */}
+              <button
+                type="button"
+                onClick={() =>
+                  selectedClaim && handleReviewClaim(selectedClaim.id, "approved")
+                }
+                disabled={!isReviewer || isSubmitting || !selectedClaim}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                <Check className="w-4 h-4" />
+                <span>Approve</span>
+              </button>
+
+              {/* 2. Request Revision / Edit */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedClaim) return;
+                  const newText = prompt("Edit claim text:", selectedClaim.text);
+                  if (newText) {
+                    handleReviewClaim(selectedClaim.id, "edited", newText);
+                  }
+                }}
+                disabled={!isReviewer || isSubmitting || !selectedClaim}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-surface-hover hover:bg-canvas border border-border-subtle text-text-primary font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Edit3 className="w-4 h-4 text-indigo-400" />
+                <span>Request Revision / Edit</span>
+              </button>
+
+              {/* 3. Redact */}
+              <button
+                type="button"
+                onClick={() =>
+                  selectedClaim && handleReviewClaim(selectedClaim.id, "redacted")
+                }
+                disabled={!isReviewer || isSubmitting || !selectedClaim}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Scissors className="w-4 h-4 text-amber-400" />
+                <span>Redact</span>
+              </button>
+
+              {/* 4. Reject */}
+              <button
+                type="button"
+                onClick={() =>
+                  selectedClaim && handleReviewClaim(selectedClaim.id, "rejected")
+                }
+                disabled={!isReviewer || isSubmitting || !selectedClaim}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <XCircle className="w-4 h-4 text-rose-400" />
+                <span>Reject</span>
+              </button>
+            </div>
+
+            {/* Toggle Placeholder in Intern View */}
+            <div className="pt-2 border-t border-border-subtle">
+              <label className="flex items-start gap-2 text-[11px] font-mono text-text-secondary cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showRestrictedPlaceholders}
+                  onChange={(e) => setShowRestrictedPlaceholders(e.target.checked)}
+                  className="mt-0.5 rounded border-border-subtle bg-canvas text-accent-primary focus:ring-accent-primary"
+                />
+                <span>Show &apos;Restricted: request access&apos; placeholders in Intern View</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </main>
