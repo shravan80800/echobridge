@@ -37,11 +37,12 @@
 - [x] `TASK-017: Implement Gap-Interview Service & /api/gap-interview Endpoint` — Built Stage 4 service in `src/services/workflow/interview.service.ts` and `/api/gap-interview` endpoint: extracts targeted knowledge gaps (unsupported claims including Trap 2: Redis Choice Rationale and Trap 7: Domain Renewal Ownership), records departing member answers, promotes Red gaps into Blue `attested` evidence (ADR-006: never counted as Green `corroborated`), generates `DraftVersion v1.1` with recalculated Confidence Score, and supports sudden-exit safety fallback routing to a named contact (e.g. Prof. Deshmukh). Verified with 6 unit tests in `tests/unit/interview.test.ts` (Trap 2 verified). All 126 tests passing.
 - [x] `TASK-018: Build Stage 4 UI — Targeted Gap-Interview Workspace (/interview & /gap-interview)` — Built Stage 4 terminal in `src/app/interview/page.tsx` and `src/app/gap-interview/page.tsx`: split-screen layout with filterable knowledge gap queue (All, Pending, Attested), `GapQuestionCard` with planted trap chips (Trap 2 & Trap 7), context alert, 1-click sample answer button for judges, Attested (Blue) attribution badge, `SuddenExitFallbackBanner` with faculty mentor assignment (Prof. Deshmukh), and Live Impact Preview comparing `v1.0 (76%)` to `v1.1 (84%)`. Verified with 5 unit tests in `tests/unit/interview-ui.test.ts`. All 131 tests passing.
 - [x] `TASK-019: Implement Review & Version Diff Service + /api/review Endpoint` — Built Stage 5 reviewer service in `src/services/workflow/review.service.ts` and `/api/review` endpoint: enforces strict Separation of Duties (ADR-007: departing member self-approval rejected with 403 Forbidden), claim mutations (`approve`, `edit`, `redact`, `reject`), side-by-side conflict resolver (Trap 1: March 15 vs. March 20 resolved to Side B), semantic version diff generator across `v1.0`, `v1.1`, and `v2.0`, and final handover publication creating `DraftVersion v2.0` (`status: 'approved'`). Verified with 13 unit tests in `tests/unit/review.test.ts`. All 144 tests passing.
+- [x] `TASK-020: Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (/review)` — Built Stage 5 Reviewer interface in `src/app/review/page.tsx` matching Proposal Figure 3: 3-column layout featuring Version History Rail (`v1.0`, `v1.1`, `v2.0`), Audience Scope Switcher (`Team Lead` vs `Intern`), `ConflictResolutionCard` for Trap 1 (1-click resolution to March 20th Planning Doc), `VersionDiffViewer` with red/green inline changes and confidence delta metrics, and `ClaimReviewActionPanel` enforcing Separation of Duties (ADR-007) with disabled controls for departing lead and active approval CTA for reviewer. Verified with 5 unit tests in `tests/unit/review-ui.test.ts`. All 149 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-020`
-- **Task Name:** Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (`/review`)
-- **Target Files:** `src/app/review/page.tsx`, `src/components/review/VersionDiffViewer.tsx`, `src/components/review/ConflictResolutionCard.tsx`, `src/components/review/ClaimReviewActionPanel.tsx`
+- **Active Task ID:** `TASK-021`
+- **Task Name:** Implement Handover Receipt & Comprehension Service + `/api/receipt` Endpoint
+- **Target Files:** `src/services/workflow/receipt.service.ts`, `src/app/api/receipt/route.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -61,6 +62,6 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-020` (Build Stage 5 UI — 3-Column Reviewer Dashboard, Version Diff Viewer, and Conflict Resolution Panel on `/review`).
+1. Execute `TASK-021` (Implement Handover Receipt & Comprehension Check Service in `src/services/workflow/receipt.service.ts` and `src/app/api/receipt/route.ts`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

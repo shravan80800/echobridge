@@ -138,13 +138,13 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Implement per-claim review actions (`approve`, `edit`, `redact`, `reject`, `resolve_conflict`), toggle for showing/hiding `Restricted` placeholders in the Intern view, version diff calculation between `v1.0`, `v1.1`, and `v2.0`, and final per-audience publication (`status: 'approved'`). Enforce server-side check: if `actor_role === 'departing_member'` attempts to approve, return `403 Forbidden` and log an `access_denied_guard` audit event.
   - **Verify:** Unit test confirms `departing_member` is blocked from approving (`403`) while `reviewer` succeeds and creates `v2.0`. [Verified: 13/13 tests pass in `tests/unit/review.test.ts`]
 
-- [ ] **TASK-020: Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (`/review`)**
-  - **Files:** `src/app/review/page.tsx`, `src/components/review/VersionDiffViewer.tsx`, `src/components/review/ConflictResolutionCard.tsx`
+- [x] **TASK-020: Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (`/review`)**
+  - **Files:** `src/app/review/page.tsx`, `src/components/review/VersionDiffViewer.tsx`, `src/components/review/ConflictResolutionCard.tsx`, `src/components/review/ClaimReviewActionPanel.tsx`
   - **Scope:** Build the 3-column Reviewer interface matching Concept Mockup Figure 3 of the Proposal:
     1. Left rail: Version History selector (`v2.0 Current`, `v1.1 After Gap-Interview`, `v1.0 Initial Draft`).
     2. Center panel: Audience tab switcher (`Team Lead View` vs. `Intern View`), inline red/green version diff view, and interactive conflict/staleness resolution cards.
     3. Right panel: Keyboard-navigable Reviewer actions (`Approve`, `Request Revision / Edit`, `Redact`, `Reject`), Intern placeholder visibility toggle, and **`Approve & Publish Audience View`** button.
-  - **Verify:** Switching to `Departing Lead` disables/blocks approval with a clear policy banner; switching to `Reviewer` enables full diff inspection, conflict resolution, and publication.
+  - **Verify:** Switching to `Departing Lead` disables/blocks approval with a clear policy banner; switching to `Reviewer` enables full diff inspection, conflict resolution, and publication. [Verified: 5/5 tests pass in `tests/unit/review-ui.test.ts`]
 
 ## Phase 7: Stage 6 — Role-Appropriate Handover, Onboarding Plan & Comprehension Receipt
 *Goal: Deliver the approved, role-scoped handover with a cited Day 1 / Week 1 / Month 1 continuation plan, critical risk comprehension check, and verified transfer receipt.*
