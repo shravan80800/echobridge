@@ -22,7 +22,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Configure `Inter`/`Geist Sans` (`font-sans`) and `JetBrains Mono`/`Geist Mono` (`font-mono`). Define obsidian-slate background tokens (`#090D16`, `#111827`), `1px` translucent borders, Electric Indigo (`#6366F1`), Cyber Cyan (`#06B6D4`), and the 7 Evidence State color tokens (`Corroborated` Emerald, `Single-source` Amber, `Attested` Blue, `Stale` Orange, `Conflicting` Purple, `Unsupported` Rose Red, `Restricted` Slate).
   - **Verify:** Root layout renders with dark obsidian styling and crisp monospace metadata fonts.
 
-- [ ] **TASK-003: Define Strict EchoBridge Domain Interfaces**
+- [x] **TASK-003: Define Strict EchoBridge Domain Interfaces**
   - **Files:** `src/types/echobridge.types.ts`
   - **Scope:** Define TypeScript types for `Role` (`departing_member` | `reviewer` | `incoming_lead` | `incoming_intern`), `SourceType` (`document` | `git_repo` | `chat_export` | `task_board` | `runbook` | `finance_folder`), `EvidenceState` (`corroborated` | `single_source` | `attested` | `stale` | `conflicting` | `unsupported` | `restricted`), `ClaimType`, `Source`, `Chunk`, `QuarantinedSecret`, `EvidenceRecord`, `ConflictPair`, `ClaimRecord`, `DraftVersion`, `GapQuestion`, `Receipt`, `AuditEvent`, and `ConfidenceBreakdown`.
   - **Verify:** `npm run typecheck` passes with zero errors.

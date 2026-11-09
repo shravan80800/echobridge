@@ -82,3 +82,20 @@ export const EVIDENCE_STATE_COLORS = {
 } as const;
 
 export type EvidenceStateKey = keyof typeof EVIDENCE_STATE_COLORS;
+
+export type NormalizedEvidenceState =
+  | "corroborated"
+  | "single_source"
+  | "attested"
+  | "stale"
+  | "conflicting"
+  | "unsupported"
+  | "restricted";
+
+export function getEvidenceStateToken(
+  state: NormalizedEvidenceState | EvidenceStateKey
+) {
+  const normalizedKey =
+    state === "single_source" ? "single-source" : state;
+  return EVIDENCE_STATE_COLORS[normalizedKey as EvidenceStateKey];
+}

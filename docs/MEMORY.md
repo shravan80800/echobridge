@@ -20,11 +20,12 @@
 ## 3. Completed Implementation Tasks
 - [x] `TASK-001: Initialize Next.js 15 App Router Project & Tooling` — Scaffolded Next.js 15 App Router, React 19, TypeScript, Tailwind CSS v3, Lucide React, Google Gen AI SDK, Supabase JS, ESLint, and Vitest. Documentation files organized into `docs/` and `.env.example` created. Builds and typechecks cleanly.
 - [x] `TASK-002: Configure Modern Tech Dark Theme & Typography (DESIGN.md)` — Configured Inter (`font-sans`) and JetBrains Mono (`font-mono`), surface tokens (`#090D16`, `#111827`, `#1E293B`), accents (`#6366F1`, `#06B6D4`), all 7 Evidence State tokens with triple-signal visual attributes, glass panel and radial top-glow styles, and updated home shell preview. All unit tests, lint, and build checks passing.
+- [x] `TASK-003: Define Strict EchoBridge Domain Interfaces` — Authored strict TypeScript types and interfaces in `src/types/echobridge.types.ts` covering the 11 database schema tables, 4 user roles, 2 audience scopes, 7 evidence states, Confidence Score formula weights, 8 planted traps verification, and audit event types. Verified with comprehensive unit test suite.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-003`
-- **Task Name:** Define Strict EchoBridge Domain Interfaces
-- **Target Files:** `src/types/echobridge.types.ts`
+- **Active Task ID:** `TASK-004`
+- **Task Name:** Build Core Reusable UI Primitives & Accessible `EvidenceBadge`
+- **Target Files:** `src/components/ui/Button.tsx`, `src/components/ui/Card.tsx`, `src/components/ui/Modal.tsx`, `src/components/ui/StateViews.tsx`, `src/components/evidence/EvidenceBadge.tsx`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
