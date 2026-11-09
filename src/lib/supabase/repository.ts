@@ -233,6 +233,10 @@ export class EchoBridgeRepository {
     );
   }
 
+  public async listQuarantinedSecrets(projectId: string): Promise<QuarantinedSecret[]> {
+    return this.listSecrets(projectId);
+  }
+
   public async createSecret(
     secret: QuarantinedSecret
   ): Promise<QuarantinedSecret> {
@@ -377,6 +381,22 @@ export class EchoBridgeRepository {
         : true;
       return projectMatch && roleMatch && draftMatch;
     });
+  }
+
+  public async getClaim(claimId: string): Promise<ClaimRecord | null> {
+    const claim = this.claims.get(claimId);
+    if (claim) return claim;
+    // Check if ID matches without version suffix
+    for (const [id, c] of this.claims.entries()) {
+      if (
+        id === claimId ||
+        id.replace(/-V1\.[012]|-V2\.0/g, "") ===
+          claimId.replace(/-V1\.[012]|-V2\.0/g, "")
+      ) {
+        return c;
+      }
+    }
+    return null;
   }
 
   public async updateClaimReview(

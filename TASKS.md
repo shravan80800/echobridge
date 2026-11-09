@@ -133,10 +133,10 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 6: Stage 5 — Human Review, Version Diff & Per-Audience Approval
 *Goal: Empower the human Reviewer (never the departing member alone) to inspect diffs across `v1.0 -> v1.1 -> v2.0`, resolve conflicts, edit/redact/reject claims, and approve each audience view.*
 
-- [ ] **TASK-019: Implement Review & Version Diff Service + `/api/review` Endpoint**
-  - **Files:** `src/services/workflow/review.service.ts`, `src/app/api/review/route.ts`, `tests/unit/review-rbac.test.ts`
+- [x] **TASK-019: Implement Review & Version Diff Service + `/api/review` Endpoint**
+  - **Files:** `src/services/workflow/review.service.ts`, `src/app/api/review/route.ts`, `tests/unit/review.test.ts`
   - **Scope:** Implement per-claim review actions (`approve`, `edit`, `redact`, `reject`, `resolve_conflict`), toggle for showing/hiding `Restricted` placeholders in the Intern view, version diff calculation between `v1.0`, `v1.1`, and `v2.0`, and final per-audience publication (`status: 'approved'`). Enforce server-side check: if `actor_role === 'departing_member'` attempts to approve, return `403 Forbidden` and log an `access_denied_guard` audit event.
-  - **Verify:** Unit test confirms `departing_member` is blocked from approving (`403`) while `reviewer` succeeds and creates `v2.0`.
+  - **Verify:** Unit test confirms `departing_member` is blocked from approving (`403`) while `reviewer` succeeds and creates `v2.0`. [Verified: 13/13 tests pass in `tests/unit/review.test.ts`]
 
 - [ ] **TASK-020: Build Stage 5 UI — 3-Column Reviewer Dashboard & Diff Inspector (`/review`)**
   - **Files:** `src/app/review/page.tsx`, `src/components/review/VersionDiffViewer.tsx`, `src/components/review/ConflictResolutionCard.tsx`
