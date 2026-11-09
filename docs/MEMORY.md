@@ -26,11 +26,12 @@
 - [x] `TASK-006: Build Synthetic CampusConnect Dataset with All 8 Planted Traps` — Authored realistic `CampusConnect` student club benchmark dataset in `src/services/seed/campus-connect.seed.ts` embedding all 8 planted traps (Trap 1 Purple conflict, Trap 2 Red gap -> Blue attested, Trap 3 Orange stale, Trap 4 quarantined secrets with 0 raw leak, Trap 5 confidential finance role isolation, Trap 6 prompt injection flagged, Trap 7 unanswerable domain question, Trap 8 mixed claim Post-Generation drop). Wired seed loader into `EchoBridgeRepository`. All 36 unit tests passing.
 - [x] `TASK-007: Implement Audit Trail Service & Global Judge Role Switcher Bar` — Implemented `audit.service.ts` and `/api/audit` route handler for immutable audit logging. Built `RoleContext`, `Navbar`, `WorkflowStepper` (6 stages + metrics link), `RoleSwitcherBar` (4 personas with dynamic permission banners), and `AuditLogDrawer` (terminal slide-over). Updated Home landing page with live KPIs, quick-jump cards, and judge evaluation guide. All 42 unit tests passing.
 - [x] `TASK-008: Implement Secret & PII Redaction Engine (redaction.service.ts)` — Implemented regex and heuristic redaction for Stripe keys, generic API keys, Google API keys, GitHub tokens, Slack tokens, Bearer tokens, DB/passwords, international phone numbers, and emails in `src/services/ingestion/redaction.service.ts`. Generates masked previews (`sk_live_••••eyA9`), creates `QuarantinedSecret` records, prevents raw secret leakage into chunks or prompts, and logs security audit events. Verified with 8 unit tests in `tests/unit/redaction.test.ts`. All 50 tests passing.
+- [x] `TASK-009: Implement Prompt-Injection Detector & Stripper (injection.service.ts)` — Implemented detection of untrusted instruction override patterns (`ignore previous instructions`, `system override`, `disregard rubric`, `mark all claims corroborated`, `auto-approve all`, turn delimiters). Strips malicious spans from model-bound chunk text while preserving authentic engineering context, provides optional placeholder replacement mode, creates typed `QuarantinedSecret` records for the Quarantine Vault, and emits immutable `injection_flagged` audit events. Verified with 11 unit tests in `tests/unit/injection.test.ts` including end-to-end Planted Trap 6 verification. All 61 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-009`
-- **Task Name:** Implement Prompt-Injection Detector & Stripper (`injection.service.ts`)
-- **Target Files:** `src/services/ingestion/injection.service.ts`, `tests/unit/injection.test.ts`
+- **Active Task ID:** `TASK-010`
+- **Task Name:** Build Source Parser, Chunker & `/api/ingest` Endpoint
+- **Target Files:** `src/services/ingestion/parser.service.ts`, `src/lib/gemini/client.ts`, `src/app/api/ingest/route.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -42,7 +43,7 @@
 | **Trap 3** | Deployment Runbook last updated 9 months ago (>6m threshold) | `date-freshness.ts` $\rightarrow$ Orange `STALE` badge | `SEEDED` |
 | **Trap 4** | Hard-coded Stripe/SendGrid API key & personal phone number | `redaction.service.ts` $\rightarrow$ Masked in chunk, stored in Quarantine Vault | `VERIFIED` |
 | **Trap 5** | Confidential Finance Folder restricted to Team Lead role | `rbac.service.ts` $\rightarrow$ Absent from Intern view (`Restricted` placeholder) | `SEEDED` |
-| **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `SEEDED` |
+| **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `VERIFIED` |
 | **Trap 7** | Unanswerable question (`"Who owns the domain renewal?"`) | `generator.service.ts` $\rightarrow$ Outputs `"Insufficient evidence"` (Red) | `SEEDED` |
 | **Trap 8** | Claim mixing public architecture doc & restricted finance source | `rbac.service.ts` $\rightarrow$ Dropped from Intern view by Post-Generation Guard | `SEEDED` |
 
@@ -50,5 +51,5 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-009` (Implement Prompt-Injection Detector & Stripper in `src/services/ingestion/injection.service.ts` and test against Trap 6 in `tests/unit/injection.test.ts`).
+1. Execute `TASK-010` (Build Source Parser, Chunker, Gemini `text-embedding-004` client with deterministic cached fallback, and `/api/ingest` endpoint).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

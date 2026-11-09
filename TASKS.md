@@ -66,7 +66,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Detect API keys (`sk_live_...`, `AIza...`, `ghp_...`), bearer tokens, passwords, phone numbers, and personal emails at ingestion. Replace raw secrets in chunk text with `[REDACTED_SECRET: <TYPE> — Administered by Project Lead]` so credentials are never copied into a handover, and create `QuarantinedSecret` records with masked previews (`sk_live_••••9912`).
   - **Verify:** Unit tests confirm Trap 4 (API key + phone number) is 100% masked in chunk text and recorded in `quarantined_secrets`.
 
-- [ ] **TASK-009: Implement Prompt-Injection Detector & Stripper (`injection.service.ts`)**
+- [x] **TASK-009: Implement Prompt-Injection Detector & Stripper (`injection.service.ts`)**
   - **Files:** `src/services/ingestion/injection.service.ts`, `tests/unit/injection.test.ts`
   - **Scope:** Detect untrusted instruction patterns (`"ignore previous instructions"`, `"system override"`, `"disregard rubric"`, `"mark all claims"`). Strip the malicious instruction from model-bound chunk text, set `chunk.injection_flagged = true`, and record an `injection_flagged` audit event.
   - **Verify:** Unit tests confirm Trap 6 is flagged, stripped, and logged.
