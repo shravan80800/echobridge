@@ -184,10 +184,10 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 9: Pre-Deployment Audit, Vercel Preview & Production Launch
 *Goal: Follow Steps 27–32 of the Vibe Coding Guide to deploy cleanly to GitHub and Vercel.*
 
-- [ ] **TASK-025: Execute Pre-Deployment Security, Accessibility & Build Audit**
-  - **Files:** All repository files
-  - **Scope:** Verify zero secrets in Git, server-side RBAC on all API routes, keyboard navigation on `/review`, responsive layouts at `375px` / `768px` / `1440px`, and clean production build (`npm run typecheck && npm run lint && npm test && npm run build`).
-  - **Verify:** Zero TypeScript, ESLint, test, or Next.js build warnings/errors.
+- [x] **TASK-025: Execute Pre-Deployment Security, Accessibility & Build Audit**
+  - **Files:** All repository files, security scan, accessibility checks
+  - **Scope:** Verify zero secrets in Git, server-side RBAC on all 8 API routes, keyboard navigation on `/review`, responsive layouts at `375px` / `768px` / `1440px`, and clean production build (`npm run typecheck && npm run lint && npm test && npm run build`).
+  - **Verify:** Zero TypeScript, ESLint, test, or Next.js build warnings/errors. 188/188 tests passing across 26 test suites. All 19 Next.js App Router routes compiled cleanly.
 
 - [ ] **TASK-026: Push to GitHub, Deploy Vercel Preview, Run Live QA & Promote to Production**
   - **Files:** `README.md`, `docs/MEMORY.md`

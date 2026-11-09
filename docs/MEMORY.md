@@ -42,11 +42,12 @@
 - [x] `TASK-022: Build Live Calibration, Metrics & 8-Trap Verification Scorecard (/metrics)` — Implemented `metrics.service.ts`, `/api/metrics`, `QualityMetricsGauge.tsx`, `TrapScorecardTable.tsx`, and `/metrics/page.tsx` reporting all 5 core target metrics from Section 10 of Round 1 Proposal: Citation Coverage (>= 95%), Unsupported as Fact (0), Planted Gaps Detected (100%), Permission Leakage (0 Leaks across Intern & Lead views), Verifier Precision/Recall (100% / 95%), and interactive 8-Trap Verification Scorecard with PASS (Verified) status pills and deep links into every stage. Verified with 5 unit tests in `tests/unit/metrics.test.ts`. All 169 tests passing.
 - [x] `TASK-023: Add Interactive Context Web & Decision Timeline View (Stretch Feature)` — Built `DecisionTimeline.tsx` with "Why" Cards, rejected alternatives, owner attributions, and Intern RBAC masking in `src/services/evidence/timeline.service.ts`; built `ContextWebGraph.tsx` with interactive SVG canvas topology linking sources, claims, people, and quarantine security vaults; wired both views into `/draft` and `/handover`. Verified with 6 unit tests in `tests/unit/decision-timeline.test.ts`. All 175 tests passing.
 - [x] `TASK-024: Write Automated Integration & Playwright E2E Test Suite` — Authored comprehensive integration test suite `tests/integration/planted-traps.test.ts` verifying all 6 stages synchronously in memory and confirming all 8 planted traps behave as specified in `PRD.md`, configured `playwright.config.ts`, and built full Playwright browser journey simulation in `tests/e2e/echobridge-workflow.spec.ts`. All 188 tests passing across 26 test suites. Production build succeeds with 0 errors.
+- [x] `TASK-025: Execute Pre-Deployment Security, Accessibility & Build Audit` — Verified zero live credentials in Git tracking (.env.example only), verified server-side RBAC on all 8 API routes (with HTTP 403 Forbidden on departing member self-approval), confirmed triple-signal accessible EvidenceBadges, responsive layouts across 375px/768px/1440px, and passed full clean validation: `npm run typecheck`, `npm run lint`, `npm test` (188/188 passing), and `npm run build` (19/19 routes compiled cleanly).
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-025`
-- **Task Name:** Execute Pre-Deployment Security, Accessibility & Build Audit
-- **Target Files:** All repository files, security scan, accessibility checks
+- **Active Task ID:** `TASK-026`
+- **Task Name:** Push to GitHub, Deploy Vercel Preview, Run Live QA & Documentation Polish
+- **Target Files:** `README.md`, `docs/MEMORY.md`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -66,5 +67,5 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-025` (Execute Pre-Deployment Security, Accessibility & Build Audit).
-2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
+1. Execute `TASK-026` (Polish README.md with comprehensive judge demo walkthrough, architecture diagrams, live credentials guidance, and 8-trap test matrix).
+2. Final Git commit and tag.
