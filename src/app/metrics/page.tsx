@@ -86,7 +86,7 @@ export default function MetricsPage() {
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary">
-            System Calibration &amp; 8-Trap Verification Scorecard
+            Handover Verification &amp; Calibration Scorecard
           </h1>
           <p className="text-sm text-text-secondary mt-1 max-w-2xl">
             Live evaluation metrics on the synthetic <strong className="text-text-primary font-mono">CampusConnect</strong> benchmark dataset. Evaluates citation coverage, zero hallucinations, privacy leakage, and all 8 planted traps.

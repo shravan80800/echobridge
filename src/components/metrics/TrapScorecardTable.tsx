@@ -45,7 +45,7 @@ export function TrapScorecardTable({ traps }: TrapScorecardTableProps) {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-accent-cyan" />
           <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-text-primary">
-            CampusConnect 8-Trap Verification Scorecard (Proposal Section 10)
+            The 8 Planted Traps Verification Matrix &amp; 8-Trap Verification Scorecard
           </h2>
         </div>
 
@@ -127,8 +127,8 @@ export function TrapScorecardTable({ traps }: TrapScorecardTableProps) {
 
                 <Link href={trap.stageRoute}>
                   <Button variant="secondary" size="sm" className="text-xs h-7 px-2.5 font-mono">
-                    <span>Inspect</span>
-                    <ExternalLink className="w-3 h-3 ml-1" />
+                    <span>Inspect Live</span>
+                    <ArrowRight className="w-3 h-3 ml-1" />
                   </Button>
                 </Link>
               </div>

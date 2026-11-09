@@ -52,7 +52,7 @@ export function ReceiptBanner({
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
-                  Verified Transfer Acknowledged
+                  Handover Verification Receipt • Verified Transfer Acknowledged
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Comprehension: {receipt.comprehension_score}%
@@ -111,7 +111,7 @@ export function ReceiptBanner({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-                Receipt: Not Yet Acknowledged
+                Handover Verification Receipt • Receipt: Not Yet Acknowledged
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 Anti-Blind Click Guard

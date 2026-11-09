@@ -60,7 +60,7 @@ export function QualityMetricsGauge({ metrics }: QualityMetricsGaugeProps) {
         {/* Metric 3: Planted Gaps Detected */}
         <Card className="p-4 bg-surface border-accent-cyan/30 space-y-1.5">
           <div className="flex items-center justify-between text-accent-cyan text-xs">
-            <span className="uppercase text-[10px] font-bold">Gaps Detected</span>
+            <span className="uppercase text-[10px] font-bold">Planted Gaps Detected</span>
             <Search className="w-3.5 h-3.5" />
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -77,14 +77,14 @@ export function QualityMetricsGauge({ metrics }: QualityMetricsGaugeProps) {
         {/* Metric 4: Permission Leakage */}
         <Card className="p-4 bg-surface border-emerald-500/30 space-y-1.5">
           <div className="flex items-center justify-between text-emerald-400 text-xs">
-            <span className="uppercase text-[10px] font-bold">Permission Leaks</span>
+            <span className="uppercase text-[10px] font-bold">Permission Leakage</span>
             <Lock className="w-3.5 h-3.5" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl md:text-3xl font-bold text-emerald-400">
               {metrics.permissionLeakageCount}
             </span>
-            <span className="text-[11px] text-emerald-300/80 font-mono">leaks</span>
+            <span className="text-[11px] text-emerald-300/80 font-mono">/ 0 leaks (Permission Leaks: 0)</span>
           </div>
           <span className="text-[10px] text-text-muted block">
             Zero finance/key leaks in Intern scope
