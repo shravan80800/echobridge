@@ -35,7 +35,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 2: Database Layer, Synthetic `CampusConnect` Seed & Judge Role Switcher
 *Goal: Set up Supabase (`pgvector`) + resilient in-memory/seed fallback so the app works out-of-the-box on both Vercel and local GitHub clones, complete with all 8 planted traps.*
 
-- [ ] **TASK-005: Create Supabase PostgreSQL + `pgvector` Migration & Client Layer**
+- [x] **TASK-005: Create Supabase PostgreSQL + `pgvector` Migration & Client Layer**
   - **Files:** `supabase/migrations/0001_initial_schema.sql`, `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`
   - **Scope:** Author the 11-table SQL schema (`projects`, `sources`, `chunks`, `quarantined_secrets`, `entities`, `draft_versions`, `claims`, `claim_evidence`, `gap_questions`, `receipts`, `audit_events`) with `vector(768)` and an RPC function for `allowed_roles` filtered vector retrieval. Implement dual-mode repository helpers that use Supabase when env vars are configured and automatically fall back to an in-memory store seeded with `CampusConnect` when running in zero-config demo mode.
   - **Verify:** `npm run typecheck` passes and repository reads/writes work in both modes.

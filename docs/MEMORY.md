@@ -22,11 +22,12 @@
 - [x] `TASK-002: Configure Modern Tech Dark Theme & Typography (DESIGN.md)` — Configured Inter (`font-sans`) and JetBrains Mono (`font-mono`), surface tokens (`#090D16`, `#111827`, `#1E293B`), accents (`#6366F1`, `#06B6D4`), all 7 Evidence State tokens with triple-signal visual attributes, glass panel and radial top-glow styles, and updated home shell preview. All unit tests, lint, and build checks passing.
 - [x] `TASK-003: Define Strict EchoBridge Domain Interfaces` — Authored strict TypeScript types and interfaces in `src/types/echobridge.types.ts` covering the 11 database schema tables, 4 user roles, 2 audience scopes, 7 evidence states, Confidence Score formula weights, 8 planted traps verification, and audit event types. Verified with comprehensive unit test suite.
 - [x] `TASK-004: Build Core Reusable UI Primitives & Accessible EvidenceBadge` — Built `Button` (5 variants, 3 sizes, loading state), `Card` (with automatic 4px left-border accent for EvidenceStates), accessible `Modal` (with backdrop blur and escape-key handling), `StateViews` (`LoadingSkeleton`, `EmptyState`, `ErrorBanner`), and `EvidenceBadge` enforcing triple-signal accessibility (Colour + Lucide Icon with data-icon + Monospace Label). All 17 unit tests passing.
+- [x] `TASK-005: Create Supabase PostgreSQL + pgvector Migration & Client Layer` — Authored 11-table PostgreSQL schema in `supabase/migrations/0001_initial_schema.sql` with `vector(768)` and `match_chunks_with_role_filter` RPC. Implemented dual-mode repository (`src/lib/supabase/repository.ts`) with seamless fallback in-memory store, role-filtered chunk retrieval (Pre-Model RBAC), claim review updates, gap-interview state transitions (`attested`), sudden exit support, and audit event logging. All 25 unit tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-005`
-- **Task Name:** Create Supabase PostgreSQL + `pgvector` Migration & Client Layer
-- **Target Files:** `supabase/migrations/0001_initial_schema.sql`, `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`
+- **Active Task ID:** `TASK-006`
+- **Task Name:** Build Synthetic `CampusConnect` Dataset with All 8 Planted Traps
+- **Target Files:** `src/services/seed/campus-connect.seed.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
