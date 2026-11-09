@@ -30,11 +30,12 @@
 - [x] `TASK-010: Build Source Parser, Chunker & /api/ingest Endpoint` — Implemented multi-modal source parser in `src/services/ingestion/parser.service.ts` supporting Markdown docs, chat exports, task boards, and confidential finance folders. Automatically enforces pre-model ACL scope isolation (restricting finance/confidential to `incoming_lead`). Integrated pre-embedding secret redaction and prompt-injection stripping. Built `src/lib/gemini/client.ts` with 768-dim `text-embedding-004` and deterministic normalized unit vector fallback. Implemented `GET` and `POST` `/api/ingest` route handlers. Verified with 14 unit tests across parser and API route suites. All 75 tests passing.
 - [x] `TASK-011: Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (/connect)` — Built `/connect` page with source inventory table, dynamic KPI counters, Source Permission Scope Map (highlighting Trap 1, 3, 4, 5, 6), `RedactionQuarantineTable` with category filters (Keys & Creds, PII, Injections), Pre-Model vs. Post-Generation RBAC architecture card, custom source ingestion modal, and one-click reconstruction trigger. Verified with unit tests in `tests/unit/quarantine-table.test.ts`. All 79 tests passing.
 - [x] `TASK-012: Implement Pre-Model & Post-Generation RBAC Guard (rbac.service.ts)` — Built two-barrier confidentiality architecture in `src/services/trust/rbac.service.ts`: Barrier 1 (`filterChunksForAudience`) ensures chunks outside audience role (e.g. `CHK-08` Finance folder) never enter model prompt context for Intern; Barrier 2 (`enforcePostGenerationGuard`) calculates `audience_acl` as strict intersection of cited chunks, drops unauthorized claims from audience view, emits immutable `access_denied_guard` audit events, and substitutes zero-leak `"Restricted: request access"` placeholders (revealing 0 topics, titles, or source counts). Separation of duties check blocks departing member self-approval. Verified with 9 unit tests in `tests/unit/rbac.test.ts` (Trap 5 and Trap 8 verified). All 88 tests passing.
+- [x] `TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (verifier.service.ts)` — Implemented Layer A deterministic verbatim quote span checking (with whitespace normalization and coordinate extraction in `src/utils/text-matching.ts`) and Layer B semantic entailment judge (with contradiction detection and token overlap heuristic). Implemented strict Author Independence Rule (Proposal page 7): 2+ supporting chunks qualify as `corroborated` (Green) ONLY if authors differ and neither quotes/copies the other; same-author statements across chat and doc count as 1 source (`single_source` Yellow); derivative quoting counts as 1 source; gap answers transition to `attested` (Blue). Verified with 13 unit tests in `tests/unit/verifier.test.ts`. All 101 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-013`
-- **Task Name:** Implement Two-Layer Citation Verifier & Author Independence Rule (`verifier.service.ts`)
-- **Target Files:** `src/utils/text-matching.ts`, `src/services/trust/verifier.service.ts`, `tests/unit/verifier.test.ts`
+- **Active Task ID:** `TASK-014`
+- **Task Name:** Implement Conflict Detector, Staleness Checker & Confidence Heuristic
+- **Target Files:** `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, `src/services/trust/confidence.service.ts`, `tests/unit/confidence.test.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -54,6 +55,8 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
+1. Execute `TASK-014` (Implement Conflict Detector, Staleness Checker, and transparent 4-part Confidence Heuristic in `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, and `src/services/trust/confidence.service.ts`).
+2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 1. Execute `TASK-013` (Implement Two-Layer Citation Verifier and Author Independence Rule in `src/utils/text-matching.ts` and `src/services/trust/verifier.service.ts`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

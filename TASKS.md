@@ -91,7 +91,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     2. `enforcePostGenerationGuard(claims, chunksById, targetRole, showRestrictedPlaceholders)`: Re-computes `claim.audience_acl` as the intersection of all cited chunks' `allowed_roles`. If any cited chunk is unauthorized for `targetRole`, drops the claim content, logs `access_denied_guard` in `audit_events`, and (if enabled) emits a generic `Restricted` placeholder (`"Restricted: request access"`) with zero topic, title, source name, or count.
   - **Verify:** Unit tests pass for Trap 5 (Finance folder withheld from Intern) and Trap 8 (Mixed public+restricted claim dropped from Intern view).
 
-- [ ] **TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (`verifier.service.ts`)**
+- [x] **TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (`verifier.service.ts`)**
   - **Files:** `src/utils/text-matching.ts`, `src/services/trust/verifier.service.ts`, `tests/unit/verifier.test.ts`
   - **Scope:**
     1. **Layer A (Deterministic):** Verify `quoted_span` exists verbatim in the cited chunk and chunk ACL permits the audience.
