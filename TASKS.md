@@ -27,7 +27,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Define TypeScript types for `Role` (`departing_member` | `reviewer` | `incoming_lead` | `incoming_intern`), `SourceType` (`document` | `git_repo` | `chat_export` | `task_board` | `runbook` | `finance_folder`), `EvidenceState` (`corroborated` | `single_source` | `attested` | `stale` | `conflicting` | `unsupported` | `restricted`), `ClaimType`, `Source`, `Chunk`, `QuarantinedSecret`, `EvidenceRecord`, `ConflictPair`, `ClaimRecord`, `DraftVersion`, `GapQuestion`, `Receipt`, `AuditEvent`, and `ConfidenceBreakdown`.
   - **Verify:** `npm run typecheck` passes with zero errors.
 
-- [ ] **TASK-004: Build Core Reusable UI Primitives & Accessible `EvidenceBadge`**
+- [x] **TASK-004: Build Core Reusable UI Primitives & Accessible `EvidenceBadge`**
   - **Files:** `src/components/ui/Button.tsx`, `src/components/ui/Card.tsx`, `src/components/ui/Modal.tsx`, `src/components/ui/StateViews.tsx`, `src/components/evidence/EvidenceBadge.tsx`
   - **Scope:** Build `Button` (Primary, Secondary, Approve, Destructive), `Card`, `Modal`, `LoadingSkeleton`, `EmptyState`, `ErrorBanner`, and `EvidenceBadge`. Ensure `EvidenceBadge` enforces the accessibility rule: simultaneous **Colour Pill + Lucide Icon (`ShieldCheck`, `AlertCircle`, `UserCheck`, `ClockAlert`, `GitCompare`, `FileQuestion`, `Lock`) + Monospace Label**.
   - **Verify:** Unit test verifies all 7 states render their exact icon, label, and semantic class.
