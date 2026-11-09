@@ -84,7 +84,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 4: Stage 3 — The Trust Pipeline, RBAC Guards & Evidence-Coloured Draft
 *Goal: Implement pre-model RBAC filtering, retrieve-only generation, two-layer citation checking, author independence rules, conflict/staleness detection, post-generation guard, and the Confidence Score HUD.*
 
-- [ ] **TASK-012: Implement Pre-Model & Post-Generation RBAC Guard (`rbac.service.ts`)**
+- [x] **TASK-012: Implement Pre-Model & Post-Generation RBAC Guard (`rbac.service.ts`)**
   - **Files:** `src/services/trust/rbac.service.ts`, `tests/unit/rbac.test.ts`
   - **Scope:**
     1. `filterChunksForAudience(chunks, targetRole)`: Returns ONLY chunks where `targetRole` is in `chunk.allowed_roles` (Intersection rule).
