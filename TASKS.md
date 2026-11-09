@@ -160,8 +160,8 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 8: Metrics Calibration Dashboard, Stretch Graph & E2E Verification
 *Goal: Expose an honest live scorecard proving all 8 planted traps and target metrics from Section 10 of the Proposal, add the interactive Context Graph, and pass all Playwright E2E checks.*
 
-- [ ] **TASK-022: Build Live Calibration, Metrics & 8-Trap Verification Scorecard (`/metrics`)**
-  - **Files:** `src/app/metrics/page.tsx`
+- [x] **TASK-022: Build Live Calibration, Metrics & 8-Trap Verification Scorecard (`/metrics`)**
+  - **Files:** `src/app/metrics/page.tsx`, `src/services/trust/metrics.service.ts`, `src/app/api/metrics/route.ts`, `src/components/metrics/QualityMetricsGauge.tsx`, `src/components/metrics/TrapScorecardTable.tsx`
   - **Scope:** Build an interactive evaluation dashboard for judges that runs the verifier against the labelled `CampusConnect` test set and reports:
     - **Citation Coverage** (Target $\ge 95\%$)
     - **Unsupported Claims Shown as Fact** (Target `0`)
@@ -169,7 +169,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     - **Permission Leakage Test Matrix** (`0 leaked items` across Intern & Lead views)
     - **Citation Checker Precision & Recall** (including documented misses/limits)
     - **Interactive 8-Trap Checklist:** Live status badge (`PASS`) and deep-link button for each of the 8 planted traps in Section 10 of the Proposal.
-  - **Verify:** All 8 planted traps display live verification evidence and link directly to the corresponding claim or quarantine record.
+  - **Verify:** All 8 planted traps display live verification evidence and link directly to the corresponding claim or quarantine record. [Verified: 5/5 tests pass in `tests/unit/metrics.test.ts`]
 
 - [ ] **TASK-023: Add Interactive Context Web & Decision Timeline View (Stretch Feature)**
   - **Files:** `src/components/evidence/DecisionTimeline.tsx`
