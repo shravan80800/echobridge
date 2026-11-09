@@ -24,11 +24,12 @@
 - [x] `TASK-004: Build Core Reusable UI Primitives & Accessible EvidenceBadge` — Built `Button` (5 variants, 3 sizes, loading state), `Card` (with automatic 4px left-border accent for EvidenceStates), accessible `Modal` (with backdrop blur and escape-key handling), `StateViews` (`LoadingSkeleton`, `EmptyState`, `ErrorBanner`), and `EvidenceBadge` enforcing triple-signal accessibility (Colour + Lucide Icon with data-icon + Monospace Label). All 17 unit tests passing.
 - [x] `TASK-005: Create Supabase PostgreSQL + pgvector Migration & Client Layer` — Authored 11-table PostgreSQL schema in `supabase/migrations/0001_initial_schema.sql` with `vector(768)` and `match_chunks_with_role_filter` RPC. Implemented dual-mode repository (`src/lib/supabase/repository.ts`) with seamless fallback in-memory store, role-filtered chunk retrieval (Pre-Model RBAC), claim review updates, gap-interview state transitions (`attested`), sudden exit support, and audit event logging. All 25 unit tests passing.
 - [x] `TASK-006: Build Synthetic CampusConnect Dataset with All 8 Planted Traps` — Authored realistic `CampusConnect` student club benchmark dataset in `src/services/seed/campus-connect.seed.ts` embedding all 8 planted traps (Trap 1 Purple conflict, Trap 2 Red gap -> Blue attested, Trap 3 Orange stale, Trap 4 quarantined secrets with 0 raw leak, Trap 5 confidential finance role isolation, Trap 6 prompt injection flagged, Trap 7 unanswerable domain question, Trap 8 mixed claim Post-Generation drop). Wired seed loader into `EchoBridgeRepository`. All 36 unit tests passing.
+- [x] `TASK-007: Implement Audit Trail Service & Global Judge Role Switcher Bar` — Implemented `audit.service.ts` and `/api/audit` route handler for immutable audit logging. Built `RoleContext`, `Navbar`, `WorkflowStepper` (6 stages + metrics link), `RoleSwitcherBar` (4 personas with dynamic permission banners), and `AuditLogDrawer` (terminal slide-over). Updated Home landing page with live KPIs, quick-jump cards, and judge evaluation guide. All 42 unit tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-007`
-- **Task Name:** Implement Audit Trail Service & Global Judge Role Switcher Bar
-- **Target Files:** `src/services/workflow/audit.service.ts`, `src/app/api/audit/route.ts`, `src/components/layout/Navbar.tsx`, `src/components/layout/RoleSwitcherBar.tsx`, `src/components/layout/AuditLogDrawer.tsx`, `src/app/page.tsx`
+- **Active Task ID:** `TASK-008`
+- **Task Name:** Implement Secret & PII Redaction Engine (`redaction.service.ts`)
+- **Target Files:** `src/services/ingestion/redaction.service.ts`, `tests/unit/redaction.test.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*

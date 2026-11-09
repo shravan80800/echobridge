@@ -53,7 +53,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     8. *Trap 8 (Mixed Public + Restricted Claim):* A claim combining public deployment architecture with confidential sponsorship hosting tier limits.
   - **Verify:** Seed loader populates all sources and chunks with accurate timestamps, authors, and ACL arrays.
 
-- [ ] **TASK-007: Implement Audit Trail Service & Global Judge Role Switcher Bar**
+- [x] **TASK-007: Implement Audit Trail Service & Global Judge Role Switcher Bar**
   - **Files:** `src/services/workflow/audit.service.ts`, `src/app/api/audit/route.ts`, `src/components/layout/Navbar.tsx`, `src/components/layout/RoleSwitcherBar.tsx`, `src/components/layout/AuditLogDrawer.tsx`, `src/app/ page.tsx`
   - **Scope:** Build the top navigation bar featuring the **6-Stage Workflow Stepper**, the **1-Click Judge Role Switcher** (`Departing Lead: Aarav`, `Reviewer: Prof. Deshmukh`, `Incoming Team Lead: Riya`, `Incoming Intern: Kabir`), and the slide-over **Audit Log Terminal Drawer**. Build the overview landing page showing project status and quick-jump cards.
   - **Verify:** Switching roles updates active session context and logs role-switch/view events in the Audit Drawer.
