@@ -35,11 +35,12 @@
 - [x] `TASK-015: Implement Retrieve-Only Generator & /api/reconstruct Endpoint` — Orchestrated the complete Stage 3 Trust Pipeline in `src/services/trust/generator.service.ts`: applies Barrier 1 Pre-Model RBAC, retrieve-only Gemini 2.5 Flash / benchmark generation with XML delimited `<chunk>` blocks and `"insufficient_evidence"` fallback for unknown domains (Trap 7), two-layer citation verifier, conflict and staleness detection (Trap 1 & 3), Barrier 2 Post-Generation RBAC guard (Trap 5 & 8), transparent 4-part Confidence Score computation, persistence of `DraftVersion v1.0` and claims to database repository, and immutable `draft_generated` audit logging. Built `GET` and `POST` `/api/reconstruct` route handlers. Verified with 5 unit tests in `tests/unit/generator.test.ts`. All 115 tests passing.
 - [x] `TASK-016: Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (/draft)` — Built `/draft` page featuring the transparent `ConfidenceScoreCard` HUD with 4 progress bars, audience view switcher (`Team Lead View` vs `Intern View` with dynamic permission pills), filterable atomic `ClaimCard` list with 4px left-border EvidenceState colors, two-column side-by-side Purple conflict matrix, zero-leak restricted placeholders in Intern view (Trap 5 & 8), evaluator real-time trap detection checklist, and interactive `SourceCitationPopover` highlighting exact verbatim quotes inside chunk context with Layer A & B status badges. Verified with 5 unit tests in `tests/unit/draft-ui.test.ts`. All 120 tests passing.
 - [x] `TASK-017: Implement Gap-Interview Service & /api/gap-interview Endpoint` — Built Stage 4 service in `src/services/workflow/interview.service.ts` and `/api/gap-interview` endpoint: extracts targeted knowledge gaps (unsupported claims including Trap 2: Redis Choice Rationale and Trap 7: Domain Renewal Ownership), records departing member answers, promotes Red gaps into Blue `attested` evidence (ADR-006: never counted as Green `corroborated`), generates `DraftVersion v1.1` with recalculated Confidence Score, and supports sudden-exit safety fallback routing to a named contact (e.g. Prof. Deshmukh). Verified with 6 unit tests in `tests/unit/interview.test.ts` (Trap 2 verified). All 126 tests passing.
+- [x] `TASK-018: Build Stage 4 UI — Targeted Gap-Interview Workspace (/interview & /gap-interview)` — Built Stage 4 terminal in `src/app/interview/page.tsx` and `src/app/gap-interview/page.tsx`: split-screen layout with filterable knowledge gap queue (All, Pending, Attested), `GapQuestionCard` with planted trap chips (Trap 2 & Trap 7), context alert, 1-click sample answer button for judges, Attested (Blue) attribution badge, `SuddenExitFallbackBanner` with faculty mentor assignment (Prof. Deshmukh), and Live Impact Preview comparing `v1.0 (76%)` to `v1.1 (84%)`. Verified with 5 unit tests in `tests/unit/interview-ui.test.ts`. All 131 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-018`
-- **Task Name:** Build Stage 4 UI — Gap-Interview Terminal & Sudden-Exit Fallback (`/interview`)
-- **Target Files:** `src/app/interview/page.tsx`, `src/components/interview/GapQuestionCard.tsx`
+- **Active Task ID:** `TASK-019`
+- **Task Name:** Implement Review & Version Diff Service + `/api/review` Endpoint
+- **Target Files:** `src/services/workflow/review.service.ts`, `src/app/api/review/route.ts`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -59,10 +60,6 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-018` (Build Stage 4 UI — Gap-Interview Terminal & Sudden-Exit Fallback on `/interview`).
-2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
-1. Execute `TASK-014` (Implement Conflict Detector, Staleness Checker, and transparent 4-part Confidence Heuristic in `src/utils/date-freshness.ts`, `src/services/trust/conflict.service.ts`, and `src/services/trust/confidence.service.ts`).
-2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
-1. Execute `TASK-013` (Implement Two-Layer Citation Verifier and Author Independence Rule in `src/utils/text-matching.ts` and `src/services/trust/verifier.service.ts`).
+1. Execute `TASK-019` (Implement Review & Version Diff Service + `/api/review` Endpoint in `src/services/workflow/review.service.ts` and `src/app/api/review/route.ts`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

@@ -40,6 +40,7 @@ export function WorkflowStepper() {
       {steps.map((step, idx) => {
         const isActive =
           pathname === step.href ||
+          (step.href === "/gap-interview" && (pathname === "/gap-interview" || pathname === "/interview")) ||
           (step.href === "/connect" && (pathname === "/connect" || pathname === "/"));
         const Icon = step.icon;
 
