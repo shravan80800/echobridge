@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { UserX, ShieldAlert, ArrowRight, RotateCcw, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -24,26 +25,28 @@ export function SuddenExitFallbackBanner({
   const [customContact, setCustomContact] = useState(assignedFallbackContact);
   const [showConfig, setShowConfig] = useState(false);
 
+  const fallbackRecipient = "Prof. Deshmukh (Faculty Mentor, CS Dept)";
+
   const handleSimulate = async () => {
-    await onSimulateSuddenExit(customContact || assignedFallbackContact);
+    await onSimulateSuddenExit(fallbackRecipient);
     setShowConfig(false);
   };
 
   return (
     <div
-      className={`rounded-xl border p-4 transition-all ${
+      className={`rounded-2xl border p-5 transition-all ${
         isSuddenExitActive
           ? "border-rose-500/40 bg-rose-950/20 shadow-lg shadow-rose-950/20"
           : "border-border-subtle bg-surface"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
           <div
-            className={`p-2 rounded-lg shrink-0 ${
+            className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
               isSuddenExitActive
                 ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                : "bg-surface-hover text-text-muted border border-border-subtle"
+                : "bg-canvas text-text-secondary border border-border-subtle"
             }`}
           >
             {isSuddenExitActive ? (
@@ -53,96 +56,69 @@ export function SuddenExitFallbackBanner({
             )}
           </div>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-text-primary">
-                Sudden Exit Safety Handler (ADR-006)
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-text-primary">
+                Sudden-Exit Safety Fallback • Sudden Exit Safety Handler (ADR-006)
               </h3>
-              {isSuddenExitActive && (
+              {isSuddenExitActive ? (
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/40">
                   Fallback Mode Active
                 </span>
+              ) : (
+                <span className="text-[11px] font-mono text-text-muted">
+                  Departing person unavailable? (Sudden Exit Mode)
+                </span>
               )}
             </div>
-            <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+
+            <p className="text-xs text-text-secondary leading-relaxed max-w-2xl">
               {isSuddenExitActive ? (
                 <>
-                  Departing member was unavailable. <strong className="text-rose-300 font-mono">{unansweredCount}</strong> knowledge gap(s) were preserved as <span className="text-rose-400 font-mono font-semibold">RED (UNSUPPORTED)</span> and automatically routed to faculty mentor <strong className="text-text-primary font-mono">{assignedFallbackContact}</strong>.
+                  Departing member was unavailable. <strong className="text-rose-300 font-mono">{unansweredCount}</strong> knowledge gap(s) were preserved as <span className="text-rose-400 font-mono font-semibold">RED (UNSUPPORTED)</span> and safely routed to faculty mentor <strong className="text-text-primary font-mono">{fallbackRecipient}</strong>.
                 </>
               ) : (
                 <>
-                  If the departing lead has abruptly departed without completing the interview, trigger this safety fallback to retain open gaps as Red and route follow-ups to a designated mentor.
+                  If the departing lead is suddenly unavailable, trigger this fallback to preserve open gaps as Red and automatically route them to <strong>{fallbackRecipient}</strong>.
                 </>
               )}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end md:self-center">
           {isSuddenExitActive ? (
             <Button
               variant="secondary"
               size="sm"
               onClick={onReset}
               disabled={isLoading}
-              className="text-xs"
+              className="text-xs font-mono"
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
               Reset Mode
             </Button>
           ) : (
             <Button
-              variant="destructive"
+              variant="secondary"
               size="sm"
-              onClick={() => setShowConfig(!showConfig)}
+              onClick={handleSimulate}
               disabled={isLoading}
-              className="text-xs"
+              className="text-xs font-mono text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/30"
+              title="Demonstrates how unanswered gaps stay Red and get assigned to Prof. Deshmukh"
             >
-              <UserX className="w-3.5 h-3.5 mr-1.5" />
               Simulate Sudden Exit
             </Button>
           )}
+
+          <Link href="/review">
+            <Button variant="primary" size="sm" className="text-xs font-mono">
+              Continue to Review (Stage 5) →
+            </Button>
+          </Link>
         </div>
       </div>
-
-      {/* Expandable Fallback Contact Configuration */}
-      {!isSuddenExitActive && showConfig && (
-        <div className="mt-4 pt-3 border-t border-border-subtle flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          <div className="flex-1">
-            <label className="block text-[11px] font-mono text-text-muted mb-1">
-              Designated Fallback Contact / Mentor:
-            </label>
-            <input
-              type="text"
-              value={customContact}
-              onChange={(e) => setCustomContact(e.target.value)}
-              placeholder="e.g. Prof. Deshmukh (Faculty Mentor, CS Dept)"
-              className="w-full px-3 py-1.5 text-xs font-mono rounded-lg bg-canvas border border-border-subtle text-text-primary focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-            />
-          </div>
-          <div className="flex items-end gap-2 pt-2 md:pt-0">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleSimulate}
-              isLoading={isLoading}
-              className="text-xs"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-              Confirm & Route Gaps
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowConfig(false)}
-              disabled={isLoading}
-              className="text-xs"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
