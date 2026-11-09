@@ -246,6 +246,21 @@ export class EchoBridgeRepository {
     return secret;
   }
 
+  public async createSecrets(
+    secrets: QuarantinedSecret[]
+  ): Promise<QuarantinedSecret[]> {
+    if (this.isConfigured()) {
+      const client = getSupabaseServerClient();
+      if (client) {
+        await client.from("quarantined_secrets").upsert(secrets);
+      }
+    }
+    for (const secret of secrets) {
+      this.secrets.set(secret.id, secret);
+    }
+    return secrets;
+  }
+
   // ==========================================================================
   // Draft Versions & Claims (Stage 3 & 5)
   // ==========================================================================

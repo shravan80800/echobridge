@@ -27,11 +27,12 @@
 - [x] `TASK-007: Implement Audit Trail Service & Global Judge Role Switcher Bar` — Implemented `audit.service.ts` and `/api/audit` route handler for immutable audit logging. Built `RoleContext`, `Navbar`, `WorkflowStepper` (6 stages + metrics link), `RoleSwitcherBar` (4 personas with dynamic permission banners), and `AuditLogDrawer` (terminal slide-over). Updated Home landing page with live KPIs, quick-jump cards, and judge evaluation guide. All 42 unit tests passing.
 - [x] `TASK-008: Implement Secret & PII Redaction Engine (redaction.service.ts)` — Implemented regex and heuristic redaction for Stripe keys, generic API keys, Google API keys, GitHub tokens, Slack tokens, Bearer tokens, DB/passwords, international phone numbers, and emails in `src/services/ingestion/redaction.service.ts`. Generates masked previews (`sk_live_••••eyA9`), creates `QuarantinedSecret` records, prevents raw secret leakage into chunks or prompts, and logs security audit events. Verified with 8 unit tests in `tests/unit/redaction.test.ts`. All 50 tests passing.
 - [x] `TASK-009: Implement Prompt-Injection Detector & Stripper (injection.service.ts)` — Implemented detection of untrusted instruction override patterns (`ignore previous instructions`, `system override`, `disregard rubric`, `mark all claims corroborated`, `auto-approve all`, turn delimiters). Strips malicious spans from model-bound chunk text while preserving authentic engineering context, provides optional placeholder replacement mode, creates typed `QuarantinedSecret` records for the Quarantine Vault, and emits immutable `injection_flagged` audit events. Verified with 11 unit tests in `tests/unit/injection.test.ts` including end-to-end Planted Trap 6 verification. All 61 tests passing.
+- [x] `TASK-010: Build Source Parser, Chunker & /api/ingest Endpoint` — Implemented multi-modal source parser in `src/services/ingestion/parser.service.ts` supporting Markdown docs, chat exports, task boards, and confidential finance folders. Automatically enforces pre-model ACL scope isolation (restricting finance/confidential to `incoming_lead`). Integrated pre-embedding secret redaction and prompt-injection stripping. Built `src/lib/gemini/client.ts` with 768-dim `text-embedding-004` and deterministic normalized unit vector fallback. Implemented `GET` and `POST` `/api/ingest` route handlers. Verified with 14 unit tests across parser and API route suites. All 75 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-010`
-- **Task Name:** Build Source Parser, Chunker & `/api/ingest` Endpoint
-- **Target Files:** `src/services/ingestion/parser.service.ts`, `src/lib/gemini/client.ts`, `src/app/api/ingest/route.ts`
+- **Active Task ID:** `TASK-011`
+- **Task Name:** Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault (`/connect`)
+- **Target Files:** `src/app/connect/page.tsx`, `src/components/review/RedactionQuarantineTable.tsx`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -51,5 +52,5 @@
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Execute `TASK-010` (Build Source Parser, Chunker, Gemini `text-embedding-004` client with deterministic cached fallback, and `/api/ingest` endpoint).
+1. Execute `TASK-011` (Build Stage 1 & 2 UI — Source Connection, ACL Scope Map & Quarantine Vault on `/connect` and `RedactionQuarantineTable.tsx`).
 2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.

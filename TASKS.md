@@ -71,7 +71,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Detect untrusted instruction patterns (`"ignore previous instructions"`, `"system override"`, `"disregard rubric"`, `"mark all claims"`). Strip the malicious instruction from model-bound chunk text, set `chunk.injection_flagged = true`, and record an `injection_flagged` audit event.
   - **Verify:** Unit tests confirm Trap 6 is flagged, stripped, and logged.
 
-- [ ] **TASK-010: Build Source Parser, Chunker & `/api/ingest` Endpoint**
+- [x] **TASK-010: Build Source Parser, Chunker & `/api/ingest` Endpoint**
   - **Files:** `src/services/ingestion/parser.service.ts`, `src/lib/gemini/client.ts`, `src/app/api/ingest/route.ts`
   - **Scope:** Parse uploaded or pre-seeded documents, Git repo exports, and chat/task exports into chunks, attach `allowed_roles` metadata, run `redaction.service` and `injection.service`, compute embeddings via Gemini `text-embedding-004` (with deterministic cached fallback), and store in database.
   - **Verify:** `POST /api/ingest` processes the `CampusConnect` sources and returns chunk counts, ACL map, quarantined secrets count, and injection warnings.
