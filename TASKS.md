@@ -176,10 +176,10 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Add a visual **Decision Timeline with "Why" Cards** on `/draft` and `/handover` connecting sources (`Git PR #12`, `Architecture Doc v2`, `Gap-Interview`) to key architectural decisions and owners, plus an **Interactive Context Web Graph** visualizing topological nodes (sources, decisions, people, secrets) and edges (citations, conflicts, attestation, quarantine).
   - **Verify:** Timeline and graph render cleanly with zero overflow, RBAC masking for Intern scope, and pass 6 unit tests in `tests/unit/decision-timeline.test.ts`. All 175 tests passing.
 
-- [ ] **TASK-024: Write Automated Integration & Playwright E2E Test Suite**
-  - **Files:** `tests/integration/planted-traps.test.ts`, `tests/e2e/echobridge-workflow.spec.ts`
-  - **Scope:** Write automated tests covering the full 6-stage flow (`Connect -> Reconstruct -> Verify -> Gap-Interview -> Review -> Handover Receipt`) and asserting all 8 planted traps behave as specified in `PRD.md`.
-  - **Verify:** `npm test` and `npm run build` pass with zero errors.
+- [x] **TASK-024: Write Automated Integration & Playwright E2E Test Suite**
+  - **Files:** `tests/integration/planted-traps.test.ts`, `tests/e2e/echobridge-workflow.spec.ts`, `playwright.config.ts`
+  - **Scope:** Author automated integration tests covering the full 6-stage flow (`Connect -> Reconstruct -> Verify -> Gap-Interview -> Review -> Handover Receipt`) asserting all 8 planted traps behave as specified in `PRD.md`, plus full Playwright browser journey simulation.
+  - **Verify:** `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` pass with zero errors. All 188 tests passing across 26 test suites.
 
 ## Phase 9: Pre-Deployment Audit, Vercel Preview & Production Launch
 *Goal: Follow Steps 27–32 of the Vibe Coding Guide to deploy cleanly to GitHub and Vercel.*
