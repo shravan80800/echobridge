@@ -61,7 +61,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
 ## Phase 3: Stage 1 & 2 — Source Connection, Redaction Quarantine & Injection Guard
 *Goal: Build the ingestion pipeline that parses sources, masks/quarantines secrets, flags prompt injections, and preserves source ACLs.*
 
-- [ ] **TASK-008: Implement Secret & PII Redaction Engine (`redaction.service.ts`)**
+- [x] **TASK-008: Implement Secret & PII Redaction Engine (`redaction.service.ts`)**
   - **Files:** `src/services/ingestion/redaction.service.ts`, `tests/unit/redaction.test.ts`
   - **Scope:** Detect API keys (`sk_live_...`, `AIza...`, `ghp_...`), bearer tokens, passwords, phone numbers, and personal emails at ingestion. Replace raw secrets in chunk text with `[REDACTED_SECRET: <TYPE> — Administered by Project Lead]` so credentials are never copied into a handover, and create `QuarantinedSecret` records with masked previews (`sk_live_••••9912`).
   - **Verify:** Unit tests confirm Trap 4 (API key + phone number) is 100% masked in chunk text and recorded in `quarantined_secrets`.
