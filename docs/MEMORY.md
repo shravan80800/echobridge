@@ -23,29 +23,30 @@
 - [x] `TASK-003: Define Strict EchoBridge Domain Interfaces` — Authored strict TypeScript types and interfaces in `src/types/echobridge.types.ts` covering the 11 database schema tables, 4 user roles, 2 audience scopes, 7 evidence states, Confidence Score formula weights, 8 planted traps verification, and audit event types. Verified with comprehensive unit test suite.
 - [x] `TASK-004: Build Core Reusable UI Primitives & Accessible EvidenceBadge` — Built `Button` (5 variants, 3 sizes, loading state), `Card` (with automatic 4px left-border accent for EvidenceStates), accessible `Modal` (with backdrop blur and escape-key handling), `StateViews` (`LoadingSkeleton`, `EmptyState`, `ErrorBanner`), and `EvidenceBadge` enforcing triple-signal accessibility (Colour + Lucide Icon with data-icon + Monospace Label). All 17 unit tests passing.
 - [x] `TASK-005: Create Supabase PostgreSQL + pgvector Migration & Client Layer` — Authored 11-table PostgreSQL schema in `supabase/migrations/0001_initial_schema.sql` with `vector(768)` and `match_chunks_with_role_filter` RPC. Implemented dual-mode repository (`src/lib/supabase/repository.ts`) with seamless fallback in-memory store, role-filtered chunk retrieval (Pre-Model RBAC), claim review updates, gap-interview state transitions (`attested`), sudden exit support, and audit event logging. All 25 unit tests passing.
+- [x] `TASK-006: Build Synthetic CampusConnect Dataset with All 8 Planted Traps` — Authored realistic `CampusConnect` student club benchmark dataset in `src/services/seed/campus-connect.seed.ts` embedding all 8 planted traps (Trap 1 Purple conflict, Trap 2 Red gap -> Blue attested, Trap 3 Orange stale, Trap 4 quarantined secrets with 0 raw leak, Trap 5 confidential finance role isolation, Trap 6 prompt injection flagged, Trap 7 unanswerable domain question, Trap 8 mixed claim Post-Generation drop). Wired seed loader into `EchoBridgeRepository`. All 36 unit tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-006`
-- **Task Name:** Build Synthetic `CampusConnect` Dataset with All 8 Planted Traps
-- **Target Files:** `src/services/seed/campus-connect.seed.ts`
+- **Active Task ID:** `TASK-007`
+- **Task Name:** Implement Audit Trail Service & Global Judge Role Switcher Bar
+- **Target Files:** `src/services/workflow/audit.service.ts`, `src/app/api/audit/route.ts`, `src/components/layout/Navbar.tsx`, `src/components/layout/RoleSwitcherBar.tsx`, `src/components/layout/AuditLogDrawer.tsx`, `src/app/page.tsx`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
 
 | Trap # | Planted Trap Description | Target Service / UI | Current Status |
 | :--- | :--- | :--- | :--- |
-| **Trap 1** | Decision in chat (15 Mar) contradicted by planning doc (20 Mar) | `conflict.service.ts` $\rightarrow$ Purple `CONFLICTING` side-by-side card | `PENDING` |
-| **Trap 2** | Key rationale for choosing Redis over Postgres exists nowhere | `interview.service.ts` $\rightarrow$ Red `UNSUPPORTED` $\rightarrow$ Blue `ATTESTED` | `PENDING` |
-| **Trap 3** | Deployment Runbook last updated 9 months ago (>6m threshold) | `date-freshness.ts` $\rightarrow$ Orange `STALE` badge | `PENDING` |
-| **Trap 4** | Hard-coded Stripe/SendGrid API key & personal phone number | `redaction.service.ts` $\rightarrow$ Masked in chunk, stored in Quarantine Vault | `PENDING` |
-| **Trap 5** | Confidential Finance Folder restricted to Team Lead role | `rbac.service.ts` $\rightarrow$ Absent from Intern view (`Restricted` placeholder) | `PENDING` |
-| **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `PENDING` |
-| **Trap 7** | Unanswerable question (`"Who owns the domain renewal?"`) | `generator.service.ts` $\rightarrow$ Outputs `"Insufficient evidence"` (Red) | `PENDING` |
-| **Trap 8** | Claim mixing public architecture doc & restricted finance source | `rbac.service.ts` $\rightarrow$ Dropped from Intern view by Post-Generation Guard | `PENDING` |
+| **Trap 1** | Decision in chat (15 Mar) contradicted by planning doc (20 Mar) | `conflict.service.ts` $\rightarrow$ Purple `CONFLICTING` side-by-side card | `SEEDED` |
+| **Trap 2** | Key rationale for choosing Redis over Postgres exists nowhere | `interview.service.ts` $\rightarrow$ Red `UNSUPPORTED` $\rightarrow$ Blue `ATTESTED` | `SEEDED` |
+| **Trap 3** | Deployment Runbook last updated 9 months ago (>6m threshold) | `date-freshness.ts` $\rightarrow$ Orange `STALE` badge | `SEEDED` |
+| **Trap 4** | Hard-coded Stripe/SendGrid API key & personal phone number | `redaction.service.ts` $\rightarrow$ Masked in chunk, stored in Quarantine Vault | `SEEDED` |
+| **Trap 5** | Confidential Finance Folder restricted to Team Lead role | `rbac.service.ts` $\rightarrow$ Absent from Intern view (`Restricted` placeholder) | `SEEDED` |
+| **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `SEEDED` |
+| **Trap 7** | Unanswerable question (`"Who owns the domain renewal?"`) | `generator.service.ts` $\rightarrow$ Outputs `"Insufficient evidence"` (Red) | `SEEDED` |
+| **Trap 8** | Claim mixing public architecture doc & restricted finance source | `rbac.service.ts` $\rightarrow$ Dropped from Intern view by Post-Generation Guard | `SEEDED` |
 
 ## 6. Known Issues & Blockers
-- None currently. Note for `TASK-005`: Ensure the repository layer automatically falls back to the in-memory `CampusConnect` seed store if `SUPABASE_URL` or `GEMINI_API_KEY` are not yet set in `.env.local` or Vercel Preview.
+- None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
 
 ## 7. Next Step
-1. Complete `TASK-001` (Initialize Next.js 15 project, TypeScript, Tailwind CSS, Lucide icons, Vitest, Playwright, and npm scripts).
-2. Run `npm run typecheck` and `npm run build` to verify clean initialization, then advance to `TASK-002`.
+1. Execute `TASK-007` (Implement Audit Trail Service, `/api/audit`, Navbar, WorkflowStepper, 1-Click Judge Role Switcher Bar, and Audit Log Terminal Drawer).
+2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation across all roles.

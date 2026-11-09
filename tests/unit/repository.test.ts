@@ -14,7 +14,7 @@ describe("EchoBridge Dual-Mode Repository (In-Memory Fallback)", () => {
   const projectId = "CampusConnect";
 
   beforeEach(() => {
-    repository.resetInMemoryStore();
+    repository.resetInMemoryStore(false);
   });
 
   it("reports fallback in-memory mode when Supabase env vars are unset or placeholders", () => {

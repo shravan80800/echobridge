@@ -20,6 +20,7 @@ import type {
 } from "@/types/echobridge.types";
 import { isSupabaseConfigured } from "./client";
 import { getSupabaseServerClient } from "./server";
+import { seedCampusConnectRepository } from "@/services/seed/campus-connect.seed";
 
 export interface SeedDataPayload {
   project?: Project;
@@ -45,8 +46,17 @@ export class EchoBridgeRepository {
   private receipts = new Map<string, Receipt>();
   private auditEvents: AuditEvent[] = [];
 
-  constructor() {
+  constructor(autoSeed = true) {
+    if (autoSeed) {
+      this.initDefaultData();
+    } else {
+      this.initDefaultProject();
+    }
+  }
+
+  public initDefaultData() {
     this.initDefaultProject();
+    seedCampusConnectRepository(this);
   }
 
   private initDefaultProject() {
@@ -252,11 +262,14 @@ export class EchoBridgeRepository {
     if (versionLabel) {
       const match = allDrafts.find((d) => d.version_label === versionLabel);
       if (match) {
-        match.claims = await this.getClaimsForAudience(
+        const claimsFromStore = await this.getClaimsForAudience(
           projectId,
           audienceRole,
           match.id
         );
+        if (claimsFromStore.length > 0) {
+          match.claims = claimsFromStore;
+        }
         return match;
       }
       return null;
@@ -275,11 +288,14 @@ export class EchoBridgeRepository {
 
     const latest = allDrafts[0] || null;
     if (latest) {
-      latest.claims = await this.getClaimsForAudience(
+      const claimsFromStore = await this.getClaimsForAudience(
         projectId,
         audienceRole,
         latest.id
       );
+      if (claimsFromStore.length > 0) {
+        latest.claims = claimsFromStore;
+      }
     }
     return latest;
   }
@@ -497,7 +513,7 @@ export class EchoBridgeRepository {
     }
   }
 
-  public resetInMemoryStore(): void {
+  public resetInMemoryStore(reSeed = true): void {
     this.projects.clear();
     this.sources.clear();
     this.chunks.clear();
@@ -507,7 +523,11 @@ export class EchoBridgeRepository {
     this.gapQuestions.clear();
     this.receipts.clear();
     this.auditEvents = [];
-    this.initDefaultProject();
+    if (reSeed) {
+      this.initDefaultData();
+    } else {
+      this.initDefaultProject();
+    }
   }
 }
 

@@ -40,7 +40,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
   - **Scope:** Author the 11-table SQL schema (`projects`, `sources`, `chunks`, `quarantined_secrets`, `entities`, `draft_versions`, `claims`, `claim_evidence`, `gap_questions`, `receipts`, `audit_events`) with `vector(768)` and an RPC function for `allowed_roles` filtered vector retrieval. Implement dual-mode repository helpers that use Supabase when env vars are configured and automatically fall back to an in-memory store seeded with `CampusConnect` when running in zero-config demo mode.
   - **Verify:** `npm run typecheck` passes and repository reads/writes work in both modes.
 
-- [ ] **TASK-006: Build Synthetic `CampusConnect` Dataset with All 8 Planted Traps**
+- [x] **TASK-006: Build Synthetic `CampusConnect` Dataset with All 8 Planted Traps**
   - **Files:** `src/services/seed/campus-connect.seed.ts`
   - **Scope:** Create the realistic `CampusConnect` student club dataset (Architecture Doc v2, GitHub PR #12 & Commit logs, Team Chat Export, Sprint Task Board, 9-month-old Deployment Runbook, and Confidential Finance Folder) containing all **8 planted traps** from Section 10 of the Proposal:
     1. *Trap 1 (Conflict):* Event registration closes March 15 (Chat Export, 2 Mar, by Dev Maya) vs. March 20 (Planning Doc, 10 Mar, by Lead Aarav).
