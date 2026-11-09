@@ -107,7 +107,7 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     3. Compute the exact Confidence Score formula: `100 * (0.40 * citation_coverage + 0.25 * corroboration_rate + 0.15 * freshness_rate + 0.20 * (1 - conflict_rate))`.
   - **Verify:** Unit tests confirm exact score math and confirm Trap 1 -> Purple, Trap 2 & 7 -> Red, Trap 3 -> Orange.
 
-- [ ] **TASK-015: Implement Retrieve-Only Generator & `/api/reconstruct` Endpoint**
+- [x] **TASK-015: Implement Retrieve-Only Generator & `/api/reconstruct` Endpoint**
   - **Files:** `src/services/trust/generator.service.ts`, `src/app/api/reconstruct/route.ts`
   - **Scope:** Orchestrate the full Stage 3 pipeline separately for `incoming_lead` and `incoming_intern`: run Pre-Model RBAC filter $\rightarrow$ Retrieve-only Gemini generation (`gemini-2.5-flash`, `temperature: 0`, delimited `<chunk>` blocks, `"insufficient_evidence"` fallback) $\rightarrow$ Two-Layer Citation Verifier $\rightarrow$ Conflict & Staleness Detector $\rightarrow$ Post-Generation Guard $\rightarrow$ Save `DraftVersion v1.0`.
   - **Verify:** Calling `POST /api/reconstruct` produces separate `v1.0` drafts for Team Lead and Intern with all 8 planted traps accurately classified.

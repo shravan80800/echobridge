@@ -32,11 +32,12 @@
 - [x] `TASK-012: Implement Pre-Model & Post-Generation RBAC Guard (rbac.service.ts)` — Built two-barrier confidentiality architecture in `src/services/trust/rbac.service.ts`: Barrier 1 (`filterChunksForAudience`) ensures chunks outside audience role (e.g. `CHK-08` Finance folder) never enter model prompt context for Intern; Barrier 2 (`enforcePostGenerationGuard`) calculates `audience_acl` as strict intersection of cited chunks, drops unauthorized claims from audience view, emits immutable `access_denied_guard` audit events, and substitutes zero-leak `"Restricted: request access"` placeholders (revealing 0 topics, titles, or source counts). Separation of duties check blocks departing member self-approval. Verified with 9 unit tests in `tests/unit/rbac.test.ts` (Trap 5 and Trap 8 verified). All 88 tests passing.
 - [x] `TASK-013: Implement Two-Layer Citation Verifier & Author Independence Rule (verifier.service.ts)` — Implemented Layer A deterministic verbatim quote span checking (with whitespace normalization and coordinate extraction in `src/utils/text-matching.ts`) and Layer B semantic entailment judge (with contradiction detection and token overlap heuristic). Implemented strict Author Independence Rule (Proposal page 7): 2+ supporting chunks qualify as `corroborated` (Green) ONLY if authors differ and neither quotes/copies the other; same-author statements across chat and doc count as 1 source (`single_source` Yellow); derivative quoting counts as 1 source; gap answers transition to `attested` (Blue). Verified with 13 unit tests in `tests/unit/verifier.test.ts`. All 101 tests passing.
 - [x] `TASK-014: Implement Conflict Detector, Staleness Checker & Confidence Heuristic` — Built conflict detection engine in `src/services/trust/conflict.service.ts` detecting entity attribute contradictions (Trap 1: March 15 vs. March 20), formatting `conflict_pair` records for side-by-side comparison, and supporting Reviewer resolution. Built staleness evaluator in `src/utils/date-freshness.ts` comparing timestamps against the 180-day threshold (Trap 3: Runbook 9 months old). Implemented exact 4-part Confidence Score formula in `src/services/trust/confidence.service.ts` (0.40 coverage + 0.25 corroboration + 0.15 freshness + 0.20 conflict-free). Verified with 9 unit tests in `tests/unit/confidence.test.ts` (Trap 1 and Trap 3 verified). All 110 tests passing.
+- [x] `TASK-015: Implement Retrieve-Only Generator & /api/reconstruct Endpoint` — Orchestrated the complete Stage 3 Trust Pipeline in `src/services/trust/generator.service.ts`: applies Barrier 1 Pre-Model RBAC, retrieve-only Gemini 2.5 Flash / benchmark generation with XML delimited `<chunk>` blocks and `"insufficient_evidence"` fallback for unknown domains (Trap 7), two-layer citation verifier, conflict and staleness detection (Trap 1 & 3), Barrier 2 Post-Generation RBAC guard (Trap 5 & 8), transparent 4-part Confidence Score computation, persistence of `DraftVersion v1.0` and claims to database repository, and immutable `draft_generated` audit logging. Built `GET` and `POST` `/api/reconstruct` route handlers. Verified with 5 unit tests in `tests/unit/generator.test.ts`. All 115 tests passing.
 
 ## 4. Current Task
-- **Active Task ID:** `TASK-015`
-- **Task Name:** Implement Retrieve-Only Generator & `/api/reconstruct` Endpoint
-- **Target Files:** `src/services/trust/generator.service.ts`, `src/app/api/reconstruct/route.ts`
+- **Active Task ID:** `TASK-016`
+- **Task Name:** Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover & Confidence HUD (`/draft`)
+- **Target Files:** `src/app/draft/page.tsx`, `src/components/evidence/ConfidenceScoreCard.tsx`, `src/components/evidence/ClaimCard.tsx`, `src/components/evidence/SourceCitationPopover.tsx`
 
 ## 5. Planted Traps Implementation Tracker (`CampusConnect` Verification)
 *(Update each trap status from `PENDING` $\rightarrow$ `SEEDED` $\rightarrow$ `VERIFIED` as tasks progress)*
@@ -49,11 +50,15 @@
 | **Trap 4** | Hard-coded Stripe/SendGrid API key & personal phone number | `redaction.service.ts` $\rightarrow$ Masked in chunk, stored in Quarantine Vault | `VERIFIED` |
 | **Trap 5** | Confidential Finance Folder restricted to Team Lead role | `rbac.service.ts` $\rightarrow$ Absent from Intern view (`Restricted` placeholder) | `VERIFIED` |
 | **Trap 6** | Prompt-injection text (`"Ignore previous instructions..."`) in doc | `injection.service.ts` $\rightarrow$ Flagged for reviewer & stripped from prompt | `VERIFIED` |
-| **Trap 7** | Unanswerable question (`"Who owns the domain renewal?"`) | `generator.service.ts` $\rightarrow$ Outputs `"Insufficient evidence"` (Red) | `SEEDED` |
+| **Trap 7** | Unanswerable question (`"Who owns the domain renewal?"`) | `generator.service.ts` $\rightarrow$ Outputs `"Insufficient evidence"` (Red) | `VERIFIED` |
 | **Trap 8** | Claim mixing public architecture doc & restricted finance source | `rbac.service.ts` $\rightarrow$ Dropped from Intern view by Post-Generation Guard | `VERIFIED` |
 
 ## 6. Known Issues & Blockers
 - None currently. Dual-mode repository with automatic `CampusConnect` seed fallback ensures full zero-config demo resilience on Vercel preview and GitHub clones.
+
+## 7. Next Step
+1. Execute `TASK-016` (Build Stage 3 UI — Evidence-Coloured Draft, Citation Popover, and Confidence Score HUD on `/draft`).
+2. Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` to verify clean operation.
 
 ## 7. Next Step
 1. Execute `TASK-015` (Implement Retrieve-Only Generator and `/api/reconstruct` endpoint).
