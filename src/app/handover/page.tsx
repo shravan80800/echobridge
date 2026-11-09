@@ -23,6 +23,7 @@ import { ReceiptBanner } from "@/components/handover/ReceiptBanner";
 import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
 import { ComprehensionQuizModal } from "@/components/handover/ComprehensionQuizModal";
 import { ReceiptCertificateModal } from "@/components/handover/ReceiptCertificateModal";
+import { DecisionTimeline } from "@/components/evidence/DecisionTimeline";
 import type {
   AudienceRole,
   ClaimRecord,
@@ -45,6 +46,7 @@ export default function HandoverPage() {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [showRestrictedPlaceholders, setShowRestrictedPlaceholders] = useState(true);
+  const [activeTab, setActiveTab] = useState<"onboarding" | "timeline">("onboarding");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -263,12 +265,48 @@ export default function HandoverPage() {
         isIncomingRole={currentRole === audienceRole}
       />
 
-      {/* 3-Column Continuation Board (Figure 7 in Proposal) */}
-      <OnboardingBoard
-        claims={claims}
-        audienceRole={audienceRole}
-        showRestrictedPlaceholders={showRestrictedPlaceholders}
-      />
+      {/* Recipient Package View Switcher */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("onboarding")}
+          className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 ${
+            activeTab === "onboarding"
+              ? "bg-accent-primary text-white shadow-md"
+              : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Continuation Board (Day 1 / Week 1 / Month 1)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("timeline")}
+          className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 ${
+            activeTab === "timeline"
+              ? "bg-accent-primary text-white shadow-md"
+              : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Architectural Decision Timeline (&quot;Why&quot; Cards)</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-200">
+            Historical Rationale
+          </span>
+        </button>
+      </div>
+
+      {/* Conditional View: 3-Column Continuation Board vs. Decision Timeline */}
+      {activeTab === "onboarding" ? (
+        <OnboardingBoard
+          claims={claims}
+          audienceRole={audienceRole}
+          showRestrictedPlaceholders={showRestrictedPlaceholders}
+        />
+      ) : (
+        <DecisionTimeline audienceRole={audienceRole} />
+      )}
 
       {/* Interactive Comprehension Quiz Modal */}
       <ComprehensionQuizModal

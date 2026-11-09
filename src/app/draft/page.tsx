@@ -35,6 +35,8 @@ import { ConfidenceScoreCard } from "@/components/evidence/ConfidenceScoreCard";
 import { ClaimCard } from "@/components/evidence/ClaimCard";
 import { SourceCitationPopover } from "@/components/evidence/SourceCitationPopover";
 import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
+import { DecisionTimeline } from "@/components/evidence/DecisionTimeline";
+import { ContextWebGraph } from "@/components/evidence/ContextWebGraph";
 import { useRole } from "@/components/layout/RoleContext";
 import type {
   AudienceRole,
@@ -67,6 +69,7 @@ export default function DraftPage() {
   const [selectedState, setSelectedState] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState<string>("all");
   const [showPlaceholders, setShowPlaceholders] = useState(true);
+  const [activeView, setActiveView] = useState<"claims" | "timeline" | "graph">("claims");
 
   // Citation Popover state
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceRecord | null>(null);
@@ -377,110 +380,170 @@ export default function DraftPage() {
             </div>
           </div>
 
-          {/* Section 2: Filters & Search Controls */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
-            {/* Search Bar */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search atomic claims by keyword or CLM-ID..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-text-muted"
-              />
-            </div>
-
-            {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Evidence State Filter */}
-              <select
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              >
-                <option value="all">All States ({rawClaims.length})</option>
-                <option value="corroborated">Corroborated (Green)</option>
-                <option value="single_source">Single-Source (Yellow)</option>
-                <option value="attested">Attested (Blue)</option>
-                <option value="stale">Stale (Orange)</option>
-                <option value="conflicting">Conflicting (Purple)</option>
-                <option value="unsupported">Unsupported (Red)</option>
-                <option value="restricted">Restricted (Lock)</option>
-              </select>
-
-              {/* Section Filter */}
-              <select
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              >
-                <option value="all">All Sections</option>
-                <option value="architecture">Architecture</option>
-                <option value="decisions">Decisions</option>
-                <option value="tasks_dependencies">Tasks & Dependencies</option>
-                <option value="contacts_ownership">Contacts & Ownership</option>
-                <option value="onboarding_day1">Day 1 Onboarding</option>
-                <option value="onboarding_week1">Week 1 Onboarding</option>
-                <option value="onboarding_month1">Month 1 Onboarding</option>
-              </select>
-
-              {/* Toggle Placeholders (Reviewer Control) */}
-              {selectedAudience === "incoming_intern" && (
-                <button
-                  onClick={() => setShowPlaceholders(!showPlaceholders)}
-                  className={`px-3 py-2 rounded-xl border text-xs font-mono transition-colors flex items-center gap-1.5 ${
-                    showPlaceholders
-                      ? "bg-surface-hover text-indigo-400 border-indigo-500/30"
-                      : "bg-surface text-text-muted border-subtle"
-                  }`}
-                  title="Toggle whether Restricted: request access placeholders are displayed in Intern View"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Placeholders: {showPlaceholders ? "ON" : "OFF"}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Section 3: Filterable Atomic Claim List */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-text-muted font-mono">
-              <span>
-                Showing {filteredClaims.length} of {rawClaims.length} claims in{" "}
-                {selectedAudience === "incoming_lead" ? "Team Lead" : "Intern"}{" "}
-                Draft v1.0
+          {/* View Mode Switcher (Claims vs. Timeline vs. Graph) */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-subtle pb-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveView("claims")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 ${
+                activeView === "claims"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-surface text-text-secondary hover:text-text-primary border border-subtle"
+              }`}
+            >
+              <FileCheck className="w-3.5 h-3.5" />
+              <span>Atomic Claims &amp; Citations</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-200">
+                {rawClaims.length}
               </span>
-              <span>Sorted by Section & Evidence State</span>
-            </div>
+            </button>
 
-            {filteredClaims.length === 0 ? (
-              <Card className="p-8 text-center text-text-muted">
-                <p className="text-sm">No claims match the active filters.</p>
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedState("all");
-                    setSelectedSection("all");
-                  }}
-                  className="mt-2 text-indigo-400 text-xs hover:underline font-mono"
-                >
-                  Clear all filters
-                </button>
-              </Card>
-            ) : (
-              <div className="space-y-3.5">
-                {filteredClaims.map((claim) => (
-                  <ClaimCard
-                    key={claim.id}
-                    claim={claim}
-                    chunksById={chunksMap}
-                    onInspectEvidence={handleOpenCitation}
-                  />
-                ))}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveView("timeline")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 ${
+                activeView === "timeline"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-surface text-text-secondary hover:text-text-primary border border-subtle"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Decision Timeline (&quot;Why&quot; Cards)</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-200">
+                Stretch Feature
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveView("graph")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 ${
+                activeView === "graph"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-surface text-text-secondary hover:text-text-primary border border-subtle"
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Context Web Graph</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-200">
+                Interactive Topology
+              </span>
+            </button>
           </div>
+
+          {/* Conditional Views */}
+          {activeView === "timeline" ? (
+            <DecisionTimeline audienceRole={selectedAudience} />
+          ) : activeView === "graph" ? (
+            <ContextWebGraph audienceRole={selectedAudience} />
+          ) : (
+            <>
+              {/* Section 2: Filters & Search Controls */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
+                {/* Search Bar */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search atomic claims by keyword or CLM-ID..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-text-muted"
+                  />
+                </div>
+
+                {/* Filter Dropdowns */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Evidence State Filter */}
+                  <select
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  >
+                    <option value="all">All States ({rawClaims.length})</option>
+                    <option value="corroborated">Corroborated (Green)</option>
+                    <option value="single_source">Single-Source (Yellow)</option>
+                    <option value="attested">Attested (Blue)</option>
+                    <option value="stale">Stale (Orange)</option>
+                    <option value="conflicting">Conflicting (Purple)</option>
+                    <option value="unsupported">Unsupported (Red)</option>
+                    <option value="restricted">Restricted (Lock)</option>
+                  </select>
+
+                  {/* Section Filter */}
+                  <select
+                    value={selectedSection}
+                    onChange={(e) => setSelectedSection(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-surface border border-subtle text-text-primary text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  >
+                    <option value="all">All Sections</option>
+                    <option value="architecture">Architecture</option>
+                    <option value="decisions">Decisions</option>
+                    <option value="tasks_dependencies">Tasks & Dependencies</option>
+                    <option value="contacts_ownership">Contacts & Ownership</option>
+                    <option value="onboarding_day1">Day 1 Onboarding</option>
+                    <option value="onboarding_week1">Week 1 Onboarding</option>
+                    <option value="onboarding_month1">Month 1 Onboarding</option>
+                  </select>
+
+                  {/* Toggle Placeholders (Reviewer Control) */}
+                  {selectedAudience === "incoming_intern" && (
+                    <button
+                      onClick={() => setShowPlaceholders(!showPlaceholders)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-mono transition-colors flex items-center gap-1.5 ${
+                        showPlaceholders
+                          ? "bg-surface-hover text-indigo-400 border-indigo-500/30"
+                          : "bg-surface text-text-muted border-subtle"
+                      }`}
+                      title="Toggle whether Restricted: request access placeholders are displayed in Intern View"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Placeholders: {showPlaceholders ? "ON" : "OFF"}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 3: Filterable Atomic Claim List */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs text-text-muted font-mono">
+                  <span>
+                    Showing {filteredClaims.length} of {rawClaims.length} claims in{" "}
+                    {selectedAudience === "incoming_lead" ? "Team Lead" : "Intern"}{" "}
+                    Draft v1.0
+                  </span>
+                  <span>Sorted by Section & Evidence State</span>
+                </div>
+
+                {filteredClaims.length === 0 ? (
+                  <Card className="p-8 text-center text-text-muted">
+                    <p className="text-sm">No claims match the active filters.</p>
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedState("all");
+                        setSelectedSection("all");
+                      }}
+                      className="mt-2 text-indigo-400 text-xs hover:underline font-mono"
+                    >
+                      Clear all filters
+                    </button>
+                  </Card>
+                ) : (
+                  <div className="space-y-3.5">
+                    {filteredClaims.map((claim) => (
+                      <ClaimCard
+                        key={claim.id}
+                        claim={claim}
+                        chunksById={chunksMap}
+                        onInspectEvidence={handleOpenCitation}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Bottom Next Stage Navigation */}
           <div className="pt-6 border-t border-subtle flex flex-col sm:flex-row items-center justify-between gap-4">

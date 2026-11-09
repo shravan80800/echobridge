@@ -405,3 +405,61 @@ export interface PlantedTrapVerification {
   target_route: string;
   verification_details?: string;
 }
+
+// ============================================================================
+// 10. Decision Timeline & Context Web Graph (Stretch Feature)
+// ============================================================================
+
+export interface DecisionTimelineItem {
+  id: string;
+  timestamp: string; // ISO or readable date e.g. "2024-01-15"
+  title: string;
+  summary: string;
+  rationale: string; // The "Why"
+  alternativesConsidered?: string[];
+  owner: string; // e.g. "Aarav Sharma"
+  sourceTitle: string;
+  sourceType: SourceType;
+  evidenceState: EvidenceState;
+  plantedTrap?: string; // e.g. "Trap 2: Missing Redis Rationale"
+  allowedRoles: AudienceRole[];
+  isRestricted?: boolean;
+}
+
+export type ContextNodeType =
+  | "source"
+  | "claim"
+  | "person"
+  | "secret"
+  | "decision";
+
+export interface ContextNode {
+  id: string;
+  label: string;
+  type: ContextNodeType;
+  evidenceState?: EvidenceState;
+  roleScope?: AudienceRole[];
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export type ContextEdgeType =
+  | "cites"
+  | "contradicts"
+  | "authored_by"
+  | "restricts"
+  | "quarantines"
+  | "attests";
+
+export interface ContextEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: ContextEdgeType;
+  style?: "solid" | "dashed" | "conflict";
+}
+
+export interface ContextGraphData {
+  nodes: ContextNode[];
+  edges: ContextEdge[];
+}
+

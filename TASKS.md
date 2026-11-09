@@ -171,10 +171,10 @@ TASK-XXX ──► Read Docs ──► Plan ──► Implement ──► Test (
     - **Interactive 8-Trap Checklist:** Live status badge (`PASS`) and deep-link button for each of the 8 planted traps in Section 10 of the Proposal.
   - **Verify:** All 8 planted traps display live verification evidence and link directly to the corresponding claim or quarantine record. [Verified: 5/5 tests pass in `tests/unit/metrics.test.ts`]
 
-- [ ] **TASK-023: Add Interactive Context Web & Decision Timeline View (Stretch Feature)**
-  - **Files:** `src/components/evidence/DecisionTimeline.tsx`
-  - **Scope:** Add a visual **Decision Timeline with "Why" Cards** on `/draft` and `/handover` connecting sources (`Git PR #12`, `Architecture Doc v2`, `Gap-Interview`) to key architectural decisions and owners.
-  - **Verify:** Timeline renders cleanly on mobile and desktop without layout overflow.
+- [x] **TASK-023: Add Interactive Context Web & Decision Timeline View (Stretch Feature)**
+  - **Files:** `src/components/evidence/DecisionTimeline.tsx`, `src/components/evidence/ContextWebGraph.tsx`, `src/services/evidence/timeline.service.ts`, `src/types/echobridge.types.ts`, `src/app/draft/page.tsx`, `src/app/handover/page.tsx`
+  - **Scope:** Add a visual **Decision Timeline with "Why" Cards** on `/draft` and `/handover` connecting sources (`Git PR #12`, `Architecture Doc v2`, `Gap-Interview`) to key architectural decisions and owners, plus an **Interactive Context Web Graph** visualizing topological nodes (sources, decisions, people, secrets) and edges (citations, conflicts, attestation, quarantine).
+  - **Verify:** Timeline and graph render cleanly with zero overflow, RBAC masking for Intern scope, and pass 6 unit tests in `tests/unit/decision-timeline.test.ts`. All 175 tests passing.
 
 - [ ] **TASK-024: Write Automated Integration & Playwright E2E Test Suite**
   - **Files:** `tests/integration/planted-traps.test.ts`, `tests/e2e/echobridge-workflow.spec.ts`
