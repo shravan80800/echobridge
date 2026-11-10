@@ -23,21 +23,21 @@ export interface ButtonProps
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-500/20 border border-indigo-500/30",
+    "bg-teal-700 hover:bg-teal-800 text-white shadow-sm border border-teal-800/20",
   secondary:
-    "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700",
+    "bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-sm",
   approve:
-    "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 border border-emerald-500/30",
+    "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border border-emerald-700/20",
   destructive:
-    "bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30",
+    "bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 shadow-sm",
   ghost:
-    "bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-white border border-transparent",
+    "bg-transparent hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-transparent",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "text-xs px-2.5 py-1.5 rounded-md gap-1.5",
-  md: "text-sm px-4 py-2 rounded-lg gap-2",
-  lg: "text-base px-5 py-2.5 rounded-lg gap-2.5",
+  sm: "min-h-[36px] text-xs px-3 py-1.5 rounded-lg gap-1.5",
+  md: "min-h-10 text-sm px-4 py-2 rounded-lg gap-2",
+  lg: "min-h-11 text-base px-5 py-2.5 rounded-lg gap-2.5",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -56,7 +56,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseClasses =
-      "inline-flex items-center justify-center font-medium transition-all select-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-canvas disabled:opacity-50 disabled:cursor-not-allowed";
+      "inline-flex items-center justify-center font-sans font-semibold cursor-pointer select-none active:scale-[0.99] transition-all focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 focus:ring-offset-slate-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100";
 
     return (
       <button

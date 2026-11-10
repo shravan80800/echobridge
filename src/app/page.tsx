@@ -5,20 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Upload,
-  Cpu,
+  FileText,
   ShieldCheck,
-  HelpCircle,
-  FileCheck2,
+  MessageSquareMore,
+  CheckSquare,
   Send,
-  BarChart2,
   ArrowRight,
-  Shield,
   UserX,
+  Shield,
   Users,
-  UserCheck,
-  Lock,
-  Unlock,
-  CheckCircle2,
 } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
 import { Button } from "@/components/ui/Button";
@@ -27,8 +22,7 @@ import type { Role } from "@/types/echobridge.types";
 interface PipelineStage {
   step: number;
   label: string;
-  subtitle: string;
-  note: string;
+  caption: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
 }
@@ -36,49 +30,43 @@ interface PipelineStage {
 const pipelineStages: PipelineStage[] = [
   {
     step: 1,
-    label: "Connect",
-    subtitle: "Sources & Quarantine",
-    note: "Redacts keys & PII (Trap 4)",
+    label: "1. Connect",
+    caption: "Choose project files and folders",
     href: "/connect",
     icon: Upload,
   },
   {
     step: 2,
-    label: "Reconstruct",
-    subtitle: "Retrieve-Only Extract",
-    note: "Pre-Model RBAC (Trap 5)",
+    label: "2. Reconstruct",
+    caption: "Build notes from cited sources",
     href: "/connect",
-    icon: Cpu,
+    icon: FileText,
   },
   {
     step: 3,
-    label: "Verify",
-    subtitle: "Two-Layer Citations",
-    note: "Author independence rule",
+    label: "3. Verify",
+    caption: "Verify quotes and flag gaps",
     href: "/draft",
     icon: ShieldCheck,
   },
   {
     step: 4,
-    label: "Gap-Interview",
-    subtitle: "Targeted Questions",
-    note: "Red gaps → Blue Attested",
+    label: "4. Gap-Interview",
+    caption: "Ask departing member missing details",
     href: "/interview",
-    icon: HelpCircle,
+    icon: MessageSquareMore,
   },
   {
     step: 5,
-    label: "Review",
-    subtitle: "Human Approval Gate",
-    note: "Conflict matrix & ADR-007",
+    label: "5. Review",
+    caption: "Mentor resolves conflicts and approves",
     href: "/review",
-    icon: FileCheck2,
+    icon: CheckSquare,
   },
   {
     step: 6,
-    label: "Handover",
-    subtitle: "Plan & Digital Receipt",
-    note: "Quiz + SHA-256 certificate",
+    label: "6. Handover",
+    caption: "Share role-scoped plan with receipt",
     href: "/handover",
     icon: Send,
   },
@@ -94,258 +82,156 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start p-4 sm:p-6 md:p-10 max-w-7xl mx-auto space-y-12">
+    <main className="w-full space-y-8">
       {/* ==================================================================== */}
-      {/* PART A: HERO SECTION                                                 */}
+      {/* SECTION 1: CLEAN HERO CARD                                           */}
       {/* ==================================================================== */}
-      <section className="w-full text-center max-w-4xl mx-auto space-y-6 pt-4 md:pt-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-accent-primary/10 text-accent-cyan border border-accent-primary/20 select-none">
-          <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
-          <span>CAMPUSCONNECT BENCHMARK LOADED</span>
-          <span>•</span>
-          <span>ZERO-CONFIG READY</span>
+      <section className="w-full bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-sm text-center space-y-5">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200 cursor-default select-none">
+          <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
+          <span>Project: CampusConnect (Student Club Handover)</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-text-primary leading-[1.15]">
+        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 leading-tight max-w-3xl mx-auto">
           Every claim cited. Every access controlled.{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary via-indigo-400 to-accent-cyan block sm:inline">
-            Nothing lost when people leave.
-          </span>
+          <span className="text-teal-700">Nothing lost when people leave.</span>
         </h1>
 
-        <p className="text-text-secondary text-sm sm:text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
-          EchoBridge reconstructs project knowledge from authorised sources, verifies
-          claims with two-layer citations, conducts targeted Gap-Interviews with
-          departing leads, and requires human mentor approval before publishing
-          role-scoped handover packages.
+        <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+          EchoBridge builds a verified handover from your project files, asks
+          the departing member only about what&apos;s missing, and lets a mentor
+          approve role-based views before sharing.
         </p>
-
-        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => handleOpenRole("departing_member", "/connect")}
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-          >
-            Start Guided Walkthrough
-          </Button>
-
-          <Link href="/metrics">
-            <Button
-              variant="secondary"
-              size="lg"
-              leftIcon={<BarChart2 className="w-4 h-4 text-accent-cyan" />}
-            >
-              Inspect 8 Planted Traps
-            </Button>
-          </Link>
-        </div>
       </section>
 
       {/* ==================================================================== */}
-      {/* PART B: CHOOSE YOUR ROLE CARD GRID (3 SIMPLE CARDS)                  */}
+      {/* SECTION 2: 3 CLEAN, ALIGNED ROLE CARDS                               */}
       {/* ==================================================================== */}
       <section className="w-full space-y-4">
-        <div className="text-center max-w-xl mx-auto mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
-            Choose Your Role to Explore
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+          <h2 className="text-lg font-semibold text-slate-900 tracking-tight">
+            Choose a role to explore
           </h2>
-          <p className="text-xs sm:text-sm text-text-muted mt-1">
-            Experience the platform through distinct security clearances and responsibilities
+          <p className="text-sm text-slate-500">
+            Select a persona to enter their workspace
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Card 1: Departing Developer */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+          {/* Card 1: Departing Member (Aarav) */}
           <div
-            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
+            className={`p-6 rounded-xl bg-white border shadow-sm flex flex-col justify-between gap-6 transition-colors ${
               currentRole === "departing_member"
-                ? "border-amber-500/50 shadow-glow"
-                : "border-border-subtle hover:border-amber-500/30"
+                ? "border-teal-600 ring-1 ring-teal-600/20"
+                : "border-slate-200"
             }`}
           >
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  DEPARTING LEAD
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 cursor-default select-none">
+                  Departing Member
                 </span>
-                <span className="text-[10px] font-mono text-text-muted">Stage 1 &amp; 4</span>
+                <UserX className="w-4 h-4 text-slate-400 shrink-0" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                  <UserX className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-text-primary">
-                    Departing Developer
-                  </h3>
-                  <span className="text-xs font-mono text-text-muted">
-                    Aarav Sharma — Lead Dev
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs text-text-secondary leading-relaxed">
-                Connect sources &amp; complete the 5-minute Gap-Interview to preserve unwritten rationale.
-              </p>
-
-              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400">✦</span>
-                  <span>Ingest Git PRs, docs, and chat logs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400">✦</span>
-                  <span>Answer Redis rationale gap (Trap 2)</span>
-                </div>
-                <div className="flex items-center gap-2 text-rose-400">
-                  <span>✕</span>
-                  <span>Self-approval strictly blocked (403)</span>
-                </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Aarav
+                </h3>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  Connect project files and answer 3 short questions about
+                  unwritten decisions.
+                </p>
               </div>
             </div>
 
-            <div className="pt-6">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full justify-center text-xs font-mono text-amber-300 hover:text-white hover:bg-amber-500/20 border-amber-500/30"
-                onClick={() => handleOpenRole("departing_member", "/connect")}
-              >
-                Open as Departing Lead (Aarav) →
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => handleOpenRole("departing_member", "/connect")}
+            >
+              Start as Departing Member →
+            </Button>
           </div>
 
-          {/* Card 2: Reviewer / Mentor */}
+          {/* Card 2: Reviewer / Mentor (Prof. Deshmukh) */}
           <div
-            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
+            className={`p-6 rounded-xl bg-white border shadow-sm flex flex-col justify-between gap-6 transition-colors ${
               currentRole === "reviewer"
-                ? "border-emerald-500/50 shadow-glow"
-                : "border-border-subtle hover:border-emerald-500/30"
+                ? "border-teal-600 ring-1 ring-teal-600/20"
+                : "border-slate-200"
             }`}
           >
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  MENTOR APPROVER
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default select-none">
+                  Reviewer / Mentor
                 </span>
-                <span className="text-[10px] font-mono text-text-muted">Stage 5</span>
+                <Shield className="w-4 h-4 text-slate-400 shrink-0" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-text-primary">
-                    Reviewer / Mentor
-                  </h3>
-                  <span className="text-xs font-mono text-text-muted">
-                    Prof. Deshmukh — Approver
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs text-text-secondary leading-relaxed">
-                Inspect evidence colours, resolve timeline conflicts, and approve published views.
-              </p>
-
-              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400">✦</span>
-                  <span>Inspect Quarantine Vault (Trap 4)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400">✦</span>
-                  <span>Resolve registration conflict (Trap 1)</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <span>✓</span>
-                  <span>Sole authority to publish v2.0 handover</span>
-                </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Prof. Deshmukh
+                </h3>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  Check source citations, resolve conflicting dates, and approve
+                  the handover.
+                </p>
               </div>
             </div>
 
-            <div className="pt-6">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full justify-center text-xs font-mono text-emerald-300 hover:text-white hover:bg-emerald-500/20 border-emerald-500/30"
-                onClick={() => handleOpenRole("reviewer", "/review")}
-              >
-                Open as Reviewer (Prof. Deshmukh) →
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => handleOpenRole("reviewer", "/review")}
+            >
+              Open Reviewer Workspace →
+            </Button>
           </div>
 
-          {/* Card 3: Incoming Successor (Lead or Intern) */}
+          {/* Card 3: Incoming Member (Riya or Kabir) */}
           <div
-            className={`p-6 rounded-2xl bg-surface border transition-all flex flex-col justify-between ${
-              currentRole === "incoming_lead" || currentRole === "incoming_intern"
-                ? "border-accent-primary/50 shadow-glow"
-                : "border-border-subtle hover:border-accent-primary/30"
+            className={`p-6 rounded-xl bg-white border shadow-sm flex flex-col justify-between gap-6 transition-colors ${
+              currentRole === "incoming_lead" ||
+              currentRole === "incoming_intern"
+                ? "border-teal-600 ring-1 ring-teal-600/20"
+                : "border-slate-200"
             }`}
           >
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-accent-primary/10 text-accent-cyan border border-accent-primary/20">
-                  ROLE-SCOPED RECIPIENTS
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200 cursor-default select-none">
+                  Incoming Member
                 </span>
-                <span className="text-[10px] font-mono text-text-muted">Stage 3 &amp; 6</span>
+                <Users className="w-4 h-4 text-slate-400 shrink-0" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-accent-primary/10 border border-accent-primary/20 text-accent-primary">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-text-primary">
-                    Incoming Successor
-                  </h3>
-                  <span className="text-xs font-mono text-text-muted">
-                    Riya (Lead) or Kabir (Intern)
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs text-text-secondary leading-relaxed">
-                View role-filtered Day 1, Week 1, Month 1 plan, pass risk quiz &amp; acknowledge receipt.
-              </p>
-
-              <div className="pt-2 border-t border-border-subtle/60 space-y-1.5 text-[11px] font-mono text-text-muted">
-                <div className="flex items-center gap-2">
-                  <Unlock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span>Lead: Sees Finance folder ($3,500)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Intern: Finance is 100% withheld</span>
-                </div>
-                <div className="flex items-center gap-2 text-accent-cyan">
-                  <span>✦</span>
-                  <span>Anti-blind risk quiz &amp; SHA-256 receipt</span>
-                </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Riya or Kabir
+                </h3>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  Read your approved Day 1, Week 1, and Month 1 plan and
+                  acknowledge receipt.
+                </p>
               </div>
             </div>
 
-            <div className="pt-6 grid grid-cols-2 gap-2">
+            <div className="space-y-2">
               <Button
-                variant="secondary"
-                size="sm"
-                className="justify-center text-[11px] font-mono text-indigo-300 hover:text-white hover:bg-indigo-500/20 border-indigo-500/30 px-2"
+                variant="primary"
+                className="w-full"
                 onClick={() => handleOpenRole("incoming_lead", "/handover")}
               >
-                Lead (Riya) →
+                View as Team Lead (Riya) →
               </Button>
               <Button
                 variant="secondary"
-                size="sm"
-                className="justify-center text-[11px] font-mono text-cyan-300 hover:text-white hover:bg-cyan-500/20 border-cyan-500/30 px-2"
+                className="w-full"
                 onClick={() => handleOpenRole("incoming_intern", "/handover")}
               >
-                Intern (Kabir) →
+                View as Intern (Kabir) →
               </Button>
             </div>
           </div>
@@ -353,26 +239,20 @@ export default function HomePage() {
       </section>
 
       {/* ==================================================================== */}
-      {/* PART C: VISUAL 6-STAGE PIPELINE BAR (MATCHING FIGURE 1)              */}
+      {/* SECTION 3: CLEAN 6-STEP VISUAL DIAGRAM (PROPOSAL FIGURE 1)           */}
       {/* ==================================================================== */}
-      <section className="w-full p-6 sm:p-8 rounded-2xl bg-surface border border-border-subtle space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-subtle pb-4">
+      <section className="w-full bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-lg font-bold text-text-primary tracking-tight">
-              The 6-Stage Epistemic Handover Pipeline
+            <h2 className="text-base font-semibold text-slate-900">
+              How EchoBridge Works
             </h2>
-            <p className="text-xs font-mono text-text-muted mt-0.5">
-              Figure 1 Architecture — From multi-modal ingestion to cryptographic sign-off
+            <p className="text-xs text-slate-500 mt-0.5">
+              Six clear steps from project files to a signed handover
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-mono text-text-muted">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Dual-Barrier RBAC Active</span>
           </div>
         </div>
 
-        {/* 6-Stage Horizontal Visual Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {pipelineStages.map((stage) => {
             const Icon = stage.icon;
@@ -381,49 +261,34 @@ export default function HomePage() {
               <Link
                 key={stage.step}
                 href={stage.href}
-                className="group p-3.5 rounded-xl bg-canvas/70 border border-border-subtle hover:border-accent-primary/50 hover:bg-surface-hover transition-all flex flex-col justify-between"
+                className="group p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-teal-500 hover:bg-teal-50/40 transition-colors flex flex-col gap-2"
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-accent-cyan px-1.5 py-0.2 rounded bg-accent-cyan/10 border border-accent-cyan/20">
-                      Stage {stage.step}
-                    </span>
-                    <Icon className="w-3.5 h-3.5 text-text-muted group-hover:text-accent-primary transition-colors" />
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-bold text-text-primary group-hover:text-accent-primary transition-colors">
-                      {stage.label}
-                    </h3>
-                    <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
-                      {stage.subtitle}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2 mt-2 border-t border-border-subtle/50">
-                  <span className="text-[10px] font-mono text-text-muted block leading-tight">
-                    {stage.note}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-teal-800">
+                    {stage.label}
                   </span>
+                  <Icon className="w-4 h-4 text-slate-400 group-hover:text-teal-700 transition-colors shrink-0" />
                 </div>
+
+                <p className="text-xs text-slate-600 leading-snug">
+                  {stage.caption}
+                </p>
               </Link>
             );
           })}
         </div>
 
-        {/* Bottom Bar: Single Direct Link to Metrics */}
-        <div className="pt-4 border-t border-border-subtle/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2 text-text-muted">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>188 Automated Tests Verified • Zero Unapproved Disclosures</span>
-          </div>
-
+        {/* Subtle Footer Link for Hackathon Judges */}
+        <div className="pt-3 border-t border-slate-100 flex justify-end">
           <Link
             href="/metrics"
-            className="text-accent-cyan hover:text-white font-bold flex items-center gap-1.5 group transition-colors"
+            className="text-xs font-medium text-slate-500 hover:text-teal-700 inline-flex items-center gap-1 transition-colors"
           >
-            <span>View 8 Planted Traps &amp; Evaluation Metrics (/metrics)</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            <span>
+              For Hackathon Judges: View Automated Evaluation &amp; 8 Test
+              Scenarios (/metrics)
+            </span>
+            <ArrowRight className="w-3.5 h-3.5 shrink-0" />
           </Link>
         </div>
       </section>

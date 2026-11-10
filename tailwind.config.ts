@@ -1,13 +1,7 @@
 import type { Config } from "tailwindcss";
-import {
-  SURFACE_COLORS,
-  ACCENT_COLORS,
-  TEXT_COLORS,
-  EVIDENCE_STATE_COLORS,
-} from "./src/utils/theme-tokens";
+import { EVIDENCE_STATE_COLORS } from "./src/utils/theme-tokens";
 
 const config: Config = {
-  darkMode: ["class"],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -16,52 +10,53 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: SURFACE_COLORS.canvas,
+        // Proposal Light Theme Surface & Typography Tokens
+        canvas: "#F8FAFC",
         surface: {
-          DEFAULT: SURFACE_COLORS.surface,
-          hover: SURFACE_COLORS.surfaceHover,
+          DEFAULT: "#FFFFFF",
+          hover: "#F1F5F9",
         },
         accent: {
-          primary: ACCENT_COLORS.primary,
-          "primary-hover": ACCENT_COLORS.primaryHover,
-          cyan: ACCENT_COLORS.cyan,
+          primary: "#0F766E",
+          "primary-hover": "#115E59",
+          cyan: "#0D9488",
         },
         text: {
-          primary: TEXT_COLORS.primary,
-          secondary: TEXT_COLORS.secondary,
-          muted: TEXT_COLORS.muted,
+          primary: "#0F172A",
+          secondary: "#475569",
+          muted: "#64748B",
         },
         border: {
-          subtle: SURFACE_COLORS.borderSubtle,
+          subtle: "#E2E8F0",
         },
         evidence: {
           corroborated: {
             DEFAULT: EVIDENCE_STATE_COLORS.corroborated.hex,
-            bg: EVIDENCE_STATE_COLORS.corroborated.bg,
+            bg: "#ECFDF5",
           },
           "single-source": {
             DEFAULT: EVIDENCE_STATE_COLORS["single-source"].hex,
-            bg: EVIDENCE_STATE_COLORS["single-source"].bg,
+            bg: "#FFFBEB",
           },
           attested: {
             DEFAULT: EVIDENCE_STATE_COLORS.attested.hex,
-            bg: EVIDENCE_STATE_COLORS.attested.bg,
+            bg: "#EFF6FF",
           },
           stale: {
             DEFAULT: EVIDENCE_STATE_COLORS.stale.hex,
-            bg: EVIDENCE_STATE_COLORS.stale.bg,
+            bg: "#FFF7ED",
           },
           conflicting: {
             DEFAULT: EVIDENCE_STATE_COLORS.conflicting.hex,
-            bg: EVIDENCE_STATE_COLORS.conflicting.bg,
+            bg: "#FAF5FF",
           },
           unsupported: {
             DEFAULT: EVIDENCE_STATE_COLORS.unsupported.hex,
-            bg: EVIDENCE_STATE_COLORS.unsupported.bg,
+            bg: "#FFF1F2",
           },
           restricted: {
             DEFAULT: EVIDENCE_STATE_COLORS.restricted.hex,
-            bg: EVIDENCE_STATE_COLORS.restricted.bg,
+            bg: "#F1F5F9",
           },
         },
       },
@@ -70,8 +65,8 @@ const config: Config = {
         mono: ["var(--font-mono)", "JetBrains Mono", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 25px -5px rgba(99, 102, 241, 0.35)",
-        "glow-cyan": "0 0 25px -5px rgba(6, 182, 212, 0.35)",
+        glow: "0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.06)",
+        "glow-cyan": "0 1px 3px 0 rgba(15, 118, 110, 0.12)",
       },
     },
   },

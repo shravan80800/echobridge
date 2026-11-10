@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Check,
   ArrowRight,
-  ShieldAlert,
 } from "lucide-react";
 import { useRole } from "./RoleContext";
 import type { Role } from "@/types/echobridge.types";
@@ -18,16 +17,14 @@ import type { Role } from "@/types/echobridge.types";
 interface PersonaOption {
   role: Role;
   name: string;
-  jobTitle: string;
+  shortName: string;
+  shortRole: string;
   label: string;
   subtitle: string;
   badge: string;
   badgeColor: string;
   workspacePath: string;
   workspaceLabel: string;
-  permissionPill: string;
-  permissionPillColor: string;
-  dotColor: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -35,78 +32,73 @@ const PERSONA_OPTIONS: PersonaOption[] = [
   {
     role: "departing_member",
     name: "Aarav",
-    jobTitle: "Lead Dev",
-    label: "1. Departing Member (Aarav — Lead Dev)",
-    subtitle: "Connects sources & answers Gap-Interview",
-    badge: "Departing Lead",
-    badgeColor: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    shortName: "Aarav",
+    shortRole: "Departing",
+    label: "Aarav Sharma — Departing Developer",
+    subtitle: "Connects project files and answers gap questions.",
+    badge: "Departing",
+    badgeColor: "bg-amber-50 text-amber-800 border-amber-200",
     workspacePath: "/connect",
-    workspaceLabel: "Connect & Gap-Interview",
-    permissionPill: "No Self-Approval",
-    permissionPillColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    dotColor: "bg-amber-400",
+    workspaceLabel: "Open Sources",
     icon: UserX,
   },
   {
     role: "reviewer",
     name: "Prof. Deshmukh",
-    jobTitle: "Mentor",
-    label: "2. Reviewer / Approver (Prof. Deshmukh — Mentor)",
-    subtitle: "Verifies claims, resolves conflicts & approves",
-    badge: "Mentor Reviewer",
-    badgeColor: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    shortName: "Deshmukh",
+    shortRole: "Mentor",
+    label: "Prof. Deshmukh — Mentor / Approver",
+    subtitle: "Checks citations, resolves conflicts, and approves.",
+    badge: "Mentor",
+    badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200",
     workspacePath: "/review",
-    workspaceLabel: "Review & Approval",
-    permissionPill: "Approval Authority",
-    permissionPillColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    dotColor: "bg-emerald-400",
+    workspaceLabel: "Open Review",
     icon: Shield,
   },
   {
     role: "incoming_lead",
     name: "Riya",
-    jobTitle: "Full Access",
-    label: "3. Incoming Team Lead (Riya — Full Access)",
-    subtitle: "Receives full handover + Finance scope",
-    badge: "Incoming Lead",
-    badgeColor: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+    shortName: "Riya",
+    shortRole: "Team Lead",
+    label: "Riya Patel — Incoming Team Lead",
+    subtitle: "Receives full handover including budget and finance.",
+    badge: "Team Lead",
+    badgeColor: "bg-blue-50 text-blue-800 border-blue-200",
     workspacePath: "/handover",
-    workspaceLabel: "Full Handover Plan",
-    permissionPill: "Finance Access",
-    permissionPillColor: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-    dotColor: "bg-indigo-400",
+    workspaceLabel: "View Handover",
     icon: UserCheck,
   },
   {
     role: "incoming_intern",
     name: "Kabir",
-    jobTitle: "Restricted Access",
-    label: "4. Incoming Intern (Kabir — Restricted Access)",
-    subtitle: "Receives intern handover (Finance hidden)",
-    badge: "Incoming Intern",
-    badgeColor: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+    shortName: "Kabir",
+    shortRole: "Intern",
+    label: "Kabir Mehta — Incoming Intern",
+    subtitle: "Receives onboarding plan with finance hidden.",
+    badge: "Intern",
+    badgeColor: "bg-slate-100 text-slate-700 border-slate-300",
     workspacePath: "/handover",
-    workspaceLabel: "Intern Handover Plan",
-    permissionPill: "Finance Restricted",
-    permissionPillColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-    dotColor: "bg-cyan-400",
+    workspaceLabel: "View Handover",
     icon: Users,
   },
 ];
 
 export function RoleSwitcherBar() {
-  const { currentRole, switchRole, bannerInfo } = useRole();
+  const { currentRole, switchRole } = useRole();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const currentOpt =
-    PERSONA_OPTIONS.find((opt) => opt.role === currentRole) || PERSONA_OPTIONS[1];
+    PERSONA_OPTIONS.find((opt) => opt.role === currentRole) ||
+    PERSONA_OPTIONS[1];
 
-  // Close dropdown on outside click or escape
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -140,55 +132,41 @@ export function RoleSwitcherBar() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <div className="flex items-center gap-2">
-        {/* Compact Single-Line Permission Pill inside Navbar */}
-        <span
-          className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border transition-colors select-none ${currentOpt.permissionPillColor}`}
-          title={bannerInfo.scopeNotice}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${currentOpt.dotColor}`} />
-          <span>{currentOpt.permissionPill}</span>
+      {/* Clean White Dropdown Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center gap-1.5 px-3 min-h-[36px] rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs sm:text-sm font-sans text-slate-800 shadow-sm cursor-pointer transition-colors select-none whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-1"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+      >
+        <span className="text-slate-500 font-normal">Role:</span>
+        <span className="font-semibold text-slate-900 sm:hidden">
+          {currentOpt.shortName}
         </span>
+        <span className="hidden sm:inline font-semibold text-slate-900">
+          {currentOpt.name} ({currentOpt.shortRole})
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-150 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
 
-        {/* Compact Role Selector Button */}
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-accent-primary/40 text-xs font-mono transition-all select-none shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary/40"
-          aria-expanded={isOpen}
-          aria-haspopup="true"
-        >
-          <span className="text-text-muted hidden sm:inline">Viewing as:</span>
-          <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${currentOpt.badgeColor}`}
-          >
-            {currentOpt.badge}
-          </span>
-          <span className="font-semibold text-text-primary">{currentOpt.name}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* Clean Dropdown Popover */}
+      {/* Clean Light Mode Popover */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-88 sm:w-96 rounded-xl bg-surface border border-border-subtle shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-2 border-b border-border-subtle mb-2 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                Simulate Persona
-              </span>
-              <span className="text-xs text-text-secondary">
-                Experience EchoBridge from 4 authentic roles
-              </span>
-            </div>
-            <ShieldAlert className="w-4 h-4 text-accent-cyan" />
+        <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white border border-slate-200 shadow-lg p-2 z-50">
+          <div className="px-2.5 py-2 border-b border-slate-100 mb-1.5">
+            <span className="text-xs font-semibold text-slate-900 block">
+              Switch Active Role
+            </span>
+            <span className="text-xs text-slate-500">
+              Preview access permissions and handover views
+            </span>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {PERSONA_OPTIONS.map((opt) => {
               const isActive = currentRole === opt.role;
               const Icon = opt.icon;
@@ -197,69 +175,51 @@ export function RoleSwitcherBar() {
                 <div
                   key={opt.role}
                   onClick={() => handleSelectRole(opt.role)}
-                  className={`group p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                  className={`p-2.5 rounded-lg border transition-colors cursor-pointer flex flex-col gap-1.5 ${
                     isActive
-                      ? "bg-accent-primary/10 border-accent-primary/40 text-text-primary"
-                      : "bg-canvas/50 border-border-subtle hover:bg-surface-hover hover:border-border-subtle"
+                      ? "bg-teal-50/70 border-teal-200"
+                      : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-200"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`p-1.5 rounded-md border ${
-                          isActive
-                            ? "bg-accent-primary/20 border-accent-primary/40 text-accent-cyan"
-                            : "bg-surface border-border-subtle text-text-muted group-hover:text-text-primary"
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 ${
+                          isActive ? "text-teal-700" : "text-slate-500"
                         }`}
-                      >
-                        <Icon className="w-3.5 h-3.5 shrink-0" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-text-primary">
-                            {opt.label}
-                          </span>
-                          {isActive && (
-                            <Check className="w-3.5 h-3.5 text-accent-cyan shrink-0" />
-                          )}
-                        </div>
-                      </div>
+                      />
+                      <span className="text-xs font-semibold text-slate-900 truncate">
+                        {opt.label}
+                      </span>
+                      {isActive && (
+                        <Check className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                      )}
                     </div>
 
                     <span
-                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${opt.badgeColor}`}
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 cursor-default ${opt.badgeColor}`}
                     >
                       {opt.badge}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-text-secondary pl-7 leading-relaxed">
+                  <p className="text-xs text-slate-600 pl-6 leading-snug">
                     {opt.subtitle}
                   </p>
 
-                  <div className="pl-7 pt-1 flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-text-muted">
-                      {opt.permissionPill}
-                    </span>
-
+                  <div className="pl-6 pt-0.5">
                     <button
                       type="button"
                       onClick={(e) => handleSwitchAndGo(e, opt)}
-                      className="text-[10px] font-mono font-bold text-accent-cyan hover:text-white flex items-center gap-1 px-2 py-0.5 rounded bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/20 transition-colors"
-                      title={`Switch to ${opt.name} and navigate to ${opt.workspaceLabel}`}
+                      className="text-xs font-medium text-teal-700 hover:text-teal-800 inline-flex items-center gap-1 hover:underline cursor-pointer"
                     >
-                      <span>Workspace</span>
+                      <span>{opt.workspaceLabel}</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
               );
             })}
-          </div>
-
-          <div className="px-3 pt-2.5 pb-1 mt-2 border-t border-border-subtle text-[10px] font-mono text-text-muted flex items-center justify-between">
-            <span>Enforces Dual-Barrier RBAC &amp; ADR-007</span>
-            <span className="text-accent-primary font-bold">1-Click Fast Switch</span>
           </div>
         </div>
       )}
@@ -269,7 +229,6 @@ export function RoleSwitcherBar() {
 
 /**
  * Kept for backward compatibility if any legacy consumer imports RoleScopeBanner.
- * The full-width stacked banner is deprecated in UI Phase 1 in favor of the navbar pill.
  */
 export function RoleScopeBanner() {
   return null;

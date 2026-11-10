@@ -19,7 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "EchoBridge — Permission-Aware Project Handover",
-  description: "Every claim cited. Every access controlled. Nothing lost when people leave.",
+  description:
+    "Every claim cited. Every access controlled. Nothing lost when people leave.",
 };
 
 export default function RootLayout({
@@ -28,11 +29,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} dark`}>
-      <body className="min-h-screen bg-canvas text-text-primary font-sans antialiased radial-glow selection:bg-accent-primary/30 selection:text-white flex flex-col">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-teal-100 selection:text-teal-900 flex flex-col overflow-x-hidden">
         <RoleProvider>
           <Navbar />
-          <div className="flex-1">{children}</div>
+          <div className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            {children}
+          </div>
           <AuditLogDrawer />
         </RoleProvider>
       </body>

@@ -3,84 +3,72 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Upload,
-  Cpu,
-  ShieldAlert,
-  HelpCircle,
-  FileCheck2,
-  Send,
-} from "lucide-react";
 
 interface Step {
   num: number;
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  matchPaths: string[];
 }
 
 const steps: Step[] = [
-  { num: 1, label: "Connect", href: "/connect", icon: Upload },
-  { num: 2, label: "Reconstruct", href: "/connect", icon: Cpu },
-  { num: 3, label: "Verify", href: "/draft", icon: ShieldAlert },
-  { num: 4, label: "Gap-Interview", href: "/interview", icon: HelpCircle },
-  { num: 5, label: "Review", href: "/review", icon: FileCheck2 },
-  { num: 6, label: "Handover", href: "/handover", icon: Send },
+  {
+    num: 1,
+    label: "1. Sources",
+    href: "/connect",
+    matchPaths: ["/connect"],
+  },
+  {
+    num: 2,
+    label: "2. Gap Interview",
+    href: "/interview",
+    matchPaths: ["/interview", "/gap-interview"],
+  },
+  {
+    num: 3,
+    label: "3. Review & Approve",
+    href: "/review",
+    matchPaths: ["/review", "/draft"],
+  },
+  {
+    num: 4,
+    label: "4. Final Handover",
+    href: "/handover",
+    matchPaths: ["/handover"],
+  },
 ];
 
-export function WorkflowStepper() {
-  const pathname = usePathname();
+interface WorkflowStepperProps {
+  mobile?: boolean;
+}
 
-  const isStepActive = (step: Step) => {
-    if (step.num === 4) {
-      return pathname === "/interview" || pathname === "/gap-interview";
-    }
-    if (step.num === 1 || step.num === 2) {
-      return pathname === "/connect";
-    }
-    if (step.num === 3) {
-      return pathname === "/draft";
-    }
-    if (step.num === 5) {
-      return pathname === "/review";
-    }
-    if (step.num === 6) {
-      return pathname === "/handover";
-    }
-    return pathname === step.href;
-  };
+export function WorkflowStepper({ mobile = false }: WorkflowStepperProps) {
+  const pathname = usePathname();
 
   return (
     <nav
-      aria-label="Workflow Stepper"
-      className="hidden lg:flex items-center gap-1 text-xs font-mono"
+      aria-label={mobile ? "Mobile Workflow Navigation" : "Workflow Stepper"}
+      className={
+        mobile
+          ? "flex md:hidden items-center gap-1.5 overflow-x-auto scrollbar-none whitespace-nowrap py-1.5"
+          : "hidden md:flex items-center gap-1 text-xs font-sans"
+      }
     >
-      {steps.map((step, idx) => {
-        const isActive = isStepActive(step);
-        const Icon = step.icon;
+      {steps.map((step) => {
+        const isActive = step.matchPaths.includes(pathname);
 
         return (
-          <React.Fragment key={step.num}>
-            <Link
-              href={step.href}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all select-none ${
-                isActive
-                  ? "bg-accent-primary/20 text-accent-cyan border border-accent-cyan/30 font-bold"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface/60"
-              }`}
-              title={`Stage ${step.num}: ${step.label}`}
-            >
-              <span className="text-[10px] opacity-70">{step.num}.</span>
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xl:inline">{step.label}</span>
-            </Link>
-
-            {idx < steps.length - 1 && (
-              <span className="text-border-subtle/80 select-none text-[11px] px-0.5">
-                →
-              </span>
-            )}
-          </React.Fragment>
+          <Link
+            key={step.num}
+            href={step.href}
+            className={`px-2.5 py-1.5 rounded-lg text-xs transition-colors select-none whitespace-nowrap ${
+              isActive
+                ? "bg-teal-50 text-teal-800 border border-teal-200 font-semibold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent font-medium"
+            }`}
+          >
+            {step.label}
+          </Link>
         );
       })}
     </nav>

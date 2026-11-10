@@ -34,9 +34,9 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         style={leftBorderStyle}
-        className={`rounded-xl bg-surface border border-border-subtle text-text-primary ${
-          hover ? "hover:bg-surface-hover transition-colors" : ""
-        } ${glow ? "shadow-glow" : ""} ${className}`}
+        className={`rounded-xl bg-white border border-slate-200 text-slate-900 shadow-sm ${
+          hover ? "hover:bg-slate-50 hover:border-slate-300 transition-colors" : ""
+        } ${glow ? "shadow-md" : ""} ${className}`}
         {...props}
       >
         {children}

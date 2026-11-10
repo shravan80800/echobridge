@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Terminal,
+  History,
   X,
   RefreshCw,
   ShieldAlert,
@@ -26,13 +26,13 @@ const eventIconMap: Partial<
 };
 
 const eventBadgeColors: Partial<Record<AuditEventType, string>> = {
-  secret_quarantined: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-  injection_flagged: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  access_denied_guard: "bg-rose-500/20 text-rose-400 border-rose-500/40",
-  handover_approved: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  role_switched: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
-  draft_generated: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
-  gap_answered: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  secret_quarantined: "bg-amber-50 text-amber-800 border-amber-200",
+  injection_flagged: "bg-rose-50 text-rose-800 border-rose-200",
+  access_denied_guard: "bg-rose-50 text-rose-800 border-rose-200",
+  handover_approved: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  role_switched: "bg-blue-50 text-blue-800 border-blue-200",
+  draft_generated: "bg-teal-50 text-teal-800 border-teal-200",
+  gap_answered: "bg-blue-50 text-blue-800 border-blue-200",
 };
 
 export function AuditLogDrawer() {
@@ -50,7 +50,7 @@ export function AuditLogDrawer() {
         setEvents(data.events);
       }
     } catch {
-      // Fallback in case of network issue
+      // Ignore network hiccup in drawer
     } finally {
       setIsLoading(false);
     }
@@ -68,49 +68,49 @@ export function AuditLogDrawer() {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Audit Log Terminal"
+      aria-label="Activity Log"
       className="fixed inset-0 z-50 flex justify-end"
     >
-      {/* Backdrop */}
+      {/* Light Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-slate-900/30 backdrop-blur-[1px] transition-opacity"
         onClick={closeAuditDrawer}
       />
 
-      {/* Terminal Drawer */}
-      <div className="relative z-10 w-full sm:w-[520px] h-full bg-[#090D16] border-l border-border-subtle flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
-        {/* Terminal Header */}
-        <div className="p-4 border-b border-border-subtle flex items-center justify-between bg-surface/50">
+      {/* Light Mode Slide-Over Drawer */}
+      <div className="relative z-10 w-full sm:w-[460px] h-full bg-white border-l border-slate-200 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-md bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20">
-              <Terminal className="w-4 h-4" />
+            <div className="p-2 rounded-lg bg-teal-50 text-teal-700 border border-teal-200">
+              <History className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs font-mono font-bold tracking-wider text-text-primary uppercase">
-                Audit Trail Terminal
+              <h3 className="text-sm font-semibold text-slate-900">
+                Activity Log
               </h3>
-              <p className="text-[10px] font-mono text-text-muted">
-                Immutable record: audit_events (Project: CampusConnect)
+              <p className="text-xs text-slate-500">
+                Recorded actions for Project: CampusConnect
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={fetchAuditEvents}
               disabled={isLoading}
-              className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-              title="Refresh audit events"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              title="Refresh activity log"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
               />
             </button>
             <button
               type="button"
               onClick={closeAuditDrawer}
-              className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
               title="Close drawer"
             >
               <X className="w-4 h-4" />
@@ -118,44 +118,43 @@ export function AuditLogDrawer() {
           </div>
         </div>
 
-        {/* Terminal Event List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 font-mono text-xs">
+        {/* Event List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-50/50">
           {events.length === 0 ? (
-            <div className="text-center py-12 text-text-muted text-xs">
-              No audit events recorded yet.
+            <div className="text-center py-12 text-slate-500 text-sm">
+              No activity events recorded yet.
             </div>
           ) : (
             events.map((event) => {
-              const Icon = eventIconMap[event.event_type] || Terminal;
+              const Icon = eventIconMap[event.event_type] || History;
               const badgeStyle =
                 eventBadgeColors[event.event_type] ||
-                "bg-slate-800 text-slate-300 border-slate-700";
+                "bg-slate-100 text-slate-700 border-slate-300";
               const isExpanded = expandedEventId === event.id;
 
               return (
                 <div
                   key={event.id}
-                  className="rounded-lg bg-surface/40 border border-border-subtle p-3 hover:bg-surface/70 transition-colors"
+                  className="rounded-lg bg-white border border-slate-200 p-3.5 shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${badgeStyle}`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-default select-none capitalize ${badgeStyle}`}
                     >
                       <Icon className="w-3 h-3 shrink-0" />
                       {event.event_type.replace(/_/g, " ")}
                     </span>
-                    <span className="text-[10px] text-text-muted shrink-0">
+                    <span className="text-xs text-slate-500 shrink-0">
                       {new Date(event.created_at).toLocaleTimeString()}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-text-secondary">
+                  <div className="flex items-center justify-between text-xs text-slate-600">
                     <span>
-                      Actor:{" "}
-                      <strong className="text-text-primary font-medium">
+                      By{" "}
+                      <strong className="text-slate-900 font-semibold">
                         {event.actor_name}
-                      </strong>{" "}
-                      ({event.actor_role})
+                      </strong>
                     </span>
 
                     <button
@@ -163,19 +162,19 @@ export function AuditLogDrawer() {
                       onClick={() =>
                         setExpandedEventId(isExpanded ? null : event.id)
                       }
-                      className="text-[10px] text-accent-cyan hover:underline flex items-center gap-0.5"
+                      className="text-xs font-medium text-teal-700 hover:text-teal-800 inline-flex items-center gap-0.5 cursor-pointer"
                     >
-                      <span>{isExpanded ? "Hide JSON" : "View JSON"}</span>
+                      <span>{isExpanded ? "Hide details" : "Details"}</span>
                       {isExpanded ? (
-                        <ChevronDown className="w-3 h-3" />
+                        <ChevronDown className="w-3.5 h-3.5" />
                       ) : (
-                        <ChevronRight className="w-3 h-3" />
+                        <ChevronRight className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>
 
                   {isExpanded && (
-                    <pre className="mt-2.5 p-2 rounded bg-black/60 border border-border-subtle text-[10px] text-accent-cyan/90 overflow-x-auto whitespace-pre-wrap break-all">
+                    <pre className="mt-2.5 p-2.5 rounded-md bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700 overflow-x-auto whitespace-pre-wrap break-all">
                       {JSON.stringify(event.details_json, null, 2)}
                     </pre>
                   )}
@@ -185,12 +184,12 @@ export function AuditLogDrawer() {
           )}
         </div>
 
-        {/* Terminal Footer */}
-        <div className="p-3 border-t border-border-subtle bg-surface/30 text-[10px] font-mono text-text-muted flex items-center justify-between">
-          <span>{events.length} audit entries loaded</span>
-          <span className="flex items-center gap-1 text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Append-only verification active
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-slate-200 bg-white text-xs text-slate-500 flex items-center justify-between">
+          <span>{events.length} recorded events</span>
+          <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            Append-only log active
           </span>
         </div>
       </div>

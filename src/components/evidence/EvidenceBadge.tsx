@@ -44,6 +44,16 @@ const iconComponentMap: Record<
   Lock,
 };
 
+const pastelBadgeStyles: Record<EvidenceState, string> = {
+  corroborated: "bg-emerald-50 text-emerald-800 border border-emerald-200",
+  single_source: "bg-amber-50 text-amber-800 border border-amber-200",
+  attested: "bg-blue-50 text-blue-800 border border-blue-200",
+  stale: "bg-orange-50 text-orange-800 border border-orange-200",
+  conflicting: "bg-purple-50 text-purple-800 border border-purple-200",
+  unsupported: "bg-rose-50 text-rose-800 border border-rose-200",
+  restricted: "bg-slate-100 text-slate-700 border border-slate-300",
+};
+
 /**
  * Returns deterministic visual metadata for any EvidenceState.
  * Adheres strictly to docs/DESIGN.md Section 4.
@@ -73,10 +83,8 @@ export interface EvidenceBadgeProps {
 }
 
 /**
- * EvidenceBadge enforces the mandatory Triple-Signal Accessibility Rule:
- * 1. Semantic Colour Pill + Border
- * 2. Distinct Lucide Icon (with data-icon attribute)
- * 3. Uppercase Monospace Text Label + Tooltip Meaning
+ * EvidenceBadge enforces Triple-Signal Accessibility (colour + icon + label)
+ * rendered as a flat non-clickable status pill so it never looks like a button.
  */
 export function EvidenceBadge({
   state,
@@ -89,8 +97,8 @@ export function EvidenceBadge({
 
   const sizeClasses =
     size === "sm"
-      ? "text-[10px] px-2 py-0.5 gap-1"
-      : "text-xs px-2.5 py-1 gap-1.5";
+      ? "px-2 py-0.5 text-[11px] gap-1"
+      : "px-2.5 py-0.5 text-xs gap-1.5";
 
   const iconSizeClasses = size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5";
 
@@ -98,12 +106,7 @@ export function EvidenceBadge({
     <span
       role="status"
       title={`${meta.label}: ${meta.meaning}`}
-      style={{
-        backgroundColor: meta.bg,
-        color: meta.hex,
-        borderColor: meta.hex,
-      }}
-      className={`inline-flex items-center font-mono font-bold uppercase tracking-wider rounded-md border border-opacity-30 select-none ${sizeClasses} ${className}`}
+      className={`inline-flex items-center font-sans font-medium rounded-full cursor-default select-none whitespace-nowrap ${pastelBadgeStyles[state]} ${sizeClasses} ${className}`}
     >
       {showIcon && IconComponent && (
         <IconComponent
