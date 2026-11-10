@@ -4,6 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReceiptBanner } from "@/components/handover/ReceiptBanner";
 import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
 import { ComprehensionQuizModal } from "@/components/handover/ComprehensionQuizModal";
+import { HandoverCertificateDocument } from "@/components/handover/HandoverCertificateDocument";
+import { ReceiptCertificateModal } from "@/components/handover/ReceiptCertificateModal";
+import { buildCertificateSvg } from "@/utils/certificate-svg";
+import { getFullVerificationKey } from "@/utils/verification-key";
 import type { Receipt, ClaimRecord, ComprehensionQuestion } from "@/types/echobridge.types";
 
 describe("Stage 6 UI: Handover Delivery, Onboarding Board & Receipt Modal (TASK-021)", () => {
@@ -177,6 +181,66 @@ describe("Stage 6 UI: Handover Delivery, Onboarding Board & Receipt Modal (TASK-
       expect(html).toContain("What is the official agreed deadline");
       expect(html).toContain("Fill Verified Answers");
       expect(html).toContain("Verify Answers &amp; Sign Receipt");
+    });
+  });
+
+  describe("HandoverCertificateDocument, Modal & SVG Export", () => {
+    it("renders formal landscape certificate artwork without action chrome and shows full SHA-256 key", () => {
+      const fullKey = getFullVerificationKey(sampleReceipt);
+      const html = renderToStaticMarkup(
+        React.createElement(HandoverCertificateDocument, {
+          receipt: sampleReceipt,
+          projectName: "CampusConnect",
+          approverName: "Prof. Deshmukh (Project Mentor)",
+        })
+      );
+
+      expect(html).toContain("Certificate of Verified Project Handover");
+      expect(html).toContain("Riya Patel");
+      expect(html).toContain("Incoming Team Lead");
+      expect(html).toContain("CampusConnect");
+      expect(html).toContain("Prof. Deshmukh — Faculty Mentor");
+      expect(html).toContain("100%");
+      expect(html).toContain(sampleReceipt.id);
+      expect(html).toContain(fullKey);
+      expect(html).not.toContain("Copy Full Verification Key");
+      expect(html).not.toContain("Print / Save Official PDF");
+      expect(html).not.toContain("Download Certificate");
+    });
+
+    it("renders ReceiptCertificateModal safely in Node SSR without throwing", () => {
+      const html = renderToStaticMarkup(
+        React.createElement(ReceiptCertificateModal, {
+          isOpen: true,
+          onClose: () => {},
+          receipt: sampleReceipt,
+          projectName: "CampusConnect",
+        })
+      );
+
+      expect(html).toContain("Official Handover Verification Certificate");
+      expect(html).toContain("Download Certificate (.svg)");
+      expect(html).toContain("Print / Save Official PDF");
+    });
+
+    it("builds valid XML-escaped standalone SVG certificate containing full SHA-256 key", () => {
+      const customReceipt: Receipt = {
+        ...sampleReceipt,
+        incoming_user_name: "Riya & Kabir <Leads>",
+      };
+      const fullKey = getFullVerificationKey(customReceipt);
+      const svg = buildCertificateSvg({
+        receipt: customReceipt,
+        projectName: "CampusConnect & Co",
+      });
+
+      expect(svg.startsWith("<?xml version=\"1.0\"")).toBe(true);
+      expect(svg).toContain('viewBox="0 0 1122 794"');
+      expect(svg).toContain(sampleReceipt.id);
+      expect(svg).toContain(fullKey);
+      expect(svg).toContain("Riya &amp; Kabir &lt;Leads&gt;");
+      expect(svg).toContain("CampusConnect &amp; Co");
+      expect(svg).not.toContain("<Leads>");
     });
   });
 });

@@ -6,6 +6,7 @@ import type { Receipt } from "@/types/echobridge.types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { getFullVerificationKey } from "@/utils/verification-key";
+import { buildCertificateSvg } from "@/utils/certificate-svg";
 import { HandoverCertificateDocument } from "@/components/handover/HandoverCertificateDocument";
 
 interface ReceiptCertificateModalProps {
@@ -66,6 +67,24 @@ export function ReceiptCertificateModal({
     setTimeout(restoreTitle, 1500);
   };
 
+  const handleDownloadSvg = () => {
+    if (typeof document === "undefined") return;
+    const svgMarkup = buildCertificateSvg({
+      receipt,
+      projectName,
+      approverName,
+    });
+    const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `EchoBridge-Certificate-${receipt.id}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  };
+
   const printablePortal =
     isMounted && typeof document !== "undefined"
       ? createPortal(
@@ -107,6 +126,14 @@ export function ReceiptCertificateModal({
                 {copied
                   ? "✓ Copied Full Verification Key!"
                   : "📋 Copy Full Verification Key"}
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDownloadSvg}
+              >
+                ⬇️ Download Certificate (.svg)
               </Button>
 
               <Button

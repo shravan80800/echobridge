@@ -2,42 +2,16 @@
 
 import React from "react";
 import type { Receipt } from "@/types/echobridge.types";
-import { getFullVerificationKey } from "@/utils/verification-key";
+import {
+  buildVerificationMatrix,
+  resolveCertificateMetadata,
+} from "@/utils/certificate-svg";
 
 export interface HandoverCertificateDocumentProps {
   receipt: Receipt;
   projectName?: string;
   approverName?: string;
   compactPreview?: boolean;
-}
-
-/**
- * Generates a deterministic 9x9 verification matrix from the full SHA-256 key
- * so each printed certificate has a crisp vector cryptographic fingerprint.
- */
-function buildVerificationMatrix(seedKey: string): boolean[][] {
-  const size = 9;
-  const grid: boolean[][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => false)
-  );
-
-  // Corner anchors for crisp seal geometry
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      const inTopLeft = r < 2 && c < 2;
-      const inTopRight = r < 2 && c >= size - 2;
-      const inBottomLeft = r >= size - 2 && c < 2;
-      if (inTopLeft || inTopRight || inBottomLeft) {
-        grid[r][c] = true;
-        continue;
-      }
-      const idx = (r * size + c) % Math.max(1, seedKey.length);
-      const code = seedKey.charCodeAt(idx) + r * 7 + c * 13;
-      grid[r][c] = code % 2 === 0;
-    }
-  }
-
-  return grid;
 }
 
 function CornerOrnament({ position }: { position: "tl" | "tr" | "bl" | "br" }) {
@@ -131,32 +105,14 @@ export function HandoverCertificateDocument({
   approverName = "Prof. Deshmukh — Faculty Mentor",
   compactPreview = false,
 }: HandoverCertificateDocumentProps) {
-  const fullKey = getFullVerificationKey(receipt);
+  const {
+    fullKey,
+    roleLabel,
+    displayApprover,
+    formattedDate,
+    formattedTime,
+  } = resolveCertificateMetadata(receipt, approverName);
   const matrix = buildVerificationMatrix(fullKey);
-  const roleLabel =
-    receipt.audience_role === "incoming_lead"
-      ? "Incoming Team Lead"
-      : "Incoming Intern";
-  const displayApprover =
-    approverName === "Prof. Deshmukh (Project Mentor)"
-      ? "Prof. Deshmukh — Faculty Mentor"
-      : approverName;
-
-  const issuedAt = new Date(receipt.acknowledged_at);
-  const formattedDate = Number.isNaN(issuedAt.getTime())
-    ? receipt.acknowledged_at
-    : issuedAt.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-  const formattedTime = Number.isNaN(issuedAt.getTime())
-    ? ""
-    : issuedAt.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZoneName: "short",
-      });
 
   return (
     <article
