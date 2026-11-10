@@ -8,10 +8,6 @@ import {
   XCircle,
   Shield,
   Lock,
-  Sparkles,
-  ArrowRight,
-  Send,
-  AlertTriangle,
 } from "lucide-react";
 import type { ClaimRecord, ReviewStatus } from "@/types/echobridge.types";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +17,12 @@ interface ClaimReviewActionPanelProps {
   selectedClaim: ClaimRecord | null;
   isReviewer: boolean;
   actorRoleName: string;
-  onReviewClaim: (claimId: string, action: ReviewStatus, editedText?: string) => Promise<void>;
+  cleanMode?: boolean;
+  onReviewClaim: (
+    claimId: string,
+    action: ReviewStatus,
+    editedText?: string
+  ) => Promise<void>;
   onApproveHandover: () => Promise<void>;
   isLoading?: boolean;
 }
@@ -30,6 +31,7 @@ export function ClaimReviewActionPanel({
   selectedClaim,
   isReviewer,
   actorRoleName,
+  cleanMode = false,
   onReviewClaim,
   onApproveHandover,
   isLoading = false,
@@ -61,34 +63,37 @@ export function ClaimReviewActionPanel({
 
   return (
     <div className="space-y-4">
-      {/* Separation of Duties Banner (ADR-007) */}
+      {/* Reviewer / Separation Banner */}
       {!isReviewer ? (
-        <div className="rounded-xl p-4 bg-rose-950/20 border border-rose-500/40 text-rose-200 text-xs space-y-2">
-          <div className="flex items-center gap-2 font-bold text-rose-300 uppercase font-mono">
-            <Lock className="w-4 h-4 text-rose-400" />
-            <span>Separation of Duties (ADR-007)</span>
+        <div className="rounded-xl p-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+          <div className="flex items-center gap-2 font-semibold text-amber-900">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>
+              {cleanMode
+                ? "Reviewer Approval Required"
+                : "Separation of Duties (ADR-007)"}
+            </span>
           </div>
-          <p className="text-text-secondary leading-relaxed">
-            Active persona is <strong className="text-text-primary font-mono">{actorRoleName}</strong>. Review mutations and final publication are strictly restricted to the human Reviewer.
+          <p className="text-slate-700 leading-relaxed">
+            Active persona is{" "}
+            <strong className="text-slate-900">{actorRoleName}</strong>. Only a
+            mentor or reviewer can approve edits or publish the handover.
           </p>
-          <div className="pt-1 text-[11px] font-mono text-accent-cyan">
-            Tip: Use the top bar Judge Role Switcher to switch to <strong>Reviewer (Prof. Deshmukh)</strong>.
-          </div>
         </div>
       ) : (
-        <div className="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
-          <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="rounded-xl p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+          <Shield className="w-4 h-4 text-emerald-700 shrink-0" />
           <span>
             Authorized Reviewer: <strong>{actorRoleName}</strong>
           </span>
         </div>
       )}
 
-      {/* Selected Claim Review Card */}
-      <div className="rounded-xl border border-border-subtle bg-surface p-4 space-y-4">
-        <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
-          <span className="text-xs font-mono font-bold uppercase text-text-primary">
-            Claim Inspection
+      {/* Selected Claim Inspection Card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <span className="text-sm font-semibold text-slate-900">
+            Actions
           </span>
           {selectedClaim && (
             <EvidenceBadge state={selectedClaim.evidence_state} size="sm" />
@@ -97,28 +102,22 @@ export function ClaimReviewActionPanel({
 
         {selectedClaim ? (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
-              <span>ID: {selectedClaim.id}</span>
-              <span className="capitalize">{selectedClaim.section}</span>
-            </div>
-
             {isEditing ? (
-              <div className="space-y-2">
-                <label className="text-[11px] font-mono text-accent-cyan block">
-                  Edit Claim Statement:
+              <div className="space-y-2.5">
+                <label className="text-xs font-medium text-slate-700 block">
+                  Edit Statement
                 </label>
                 <textarea
                   rows={3}
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  className="w-full p-2.5 text-xs font-mono rounded-lg bg-canvas border border-border-subtle text-text-primary focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full p-2.5 text-sm rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setIsEditing(false)}
-                    className="text-xs h-7 px-2"
                   >
                     Cancel
                   </Button>
@@ -127,32 +126,31 @@ export function ClaimReviewActionPanel({
                     size="sm"
                     onClick={handleSaveEdit}
                     disabled={!editText.trim() || isLoading}
-                    className="text-xs h-7 px-3 bg-indigo-600 hover:bg-indigo-500"
                   >
                     Save Edit
                   </Button>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-text-primary leading-relaxed font-sans bg-canvas/40 p-3 rounded-lg border border-border-subtle">
+              <p className="text-sm text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200">
                 {selectedClaim.text}
               </p>
             )}
 
             {/* Current Review Status */}
-            <div className="flex items-center justify-between text-[11px] font-mono pt-1">
-              <span className="text-text-muted">Review Status:</span>
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-slate-500 font-medium">Review Status:</span>
               <span
-                className={`px-2 py-0.5 rounded font-bold uppercase ${
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize border cursor-default select-none ${
                   selectedClaim.review?.status === "approved"
-                    ? "bg-emerald-500/20 text-emerald-400"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                     : selectedClaim.review?.status === "edited"
-                    ? "bg-indigo-500/20 text-indigo-300"
+                    ? "bg-blue-50 text-blue-800 border-blue-200"
                     : selectedClaim.review?.status === "redacted"
-                    ? "bg-amber-500/20 text-amber-300"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
                     : selectedClaim.review?.status === "rejected"
-                    ? "bg-rose-500/20 text-rose-400"
-                    : "bg-surface-hover text-text-secondary"
+                    ? "bg-rose-50 text-rose-800 border-rose-200"
+                    : "bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
                 {selectedClaim.review?.status || "pending"}
@@ -160,15 +158,15 @@ export function ClaimReviewActionPanel({
             </div>
 
             {/* Reviewer Action Buttons */}
-            <div className="pt-2 border-t border-border-subtle/60 grid grid-cols-2 gap-2">
+            <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
               <Button
                 variant="approve"
                 size="sm"
                 onClick={() => onReviewClaim(selectedClaim.id, "approved")}
                 disabled={!isReviewer || isLoading}
-                className="text-xs w-full"
+                leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                 Approve
               </Button>
 
@@ -177,20 +175,20 @@ export function ClaimReviewActionPanel({
                 size="sm"
                 onClick={handleStartEdit}
                 disabled={!isReviewer || isLoading}
-                className="text-xs w-full"
+                leftIcon={<Edit3 className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <Edit3 className="w-3.5 h-3.5 mr-1" />
-                Edit
+                {cleanMode ? "Request Revision" : "Edit"}
               </Button>
 
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 onClick={() => onReviewClaim(selectedClaim.id, "redacted")}
                 disabled={!isReviewer || isLoading}
-                className="text-xs w-full text-amber-300 hover:bg-amber-500/10"
+                leftIcon={<EyeOff className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <EyeOff className="w-3.5 h-3.5 mr-1" />
                 Redact
               </Button>
 
@@ -199,49 +197,48 @@ export function ClaimReviewActionPanel({
                 size="sm"
                 onClick={() => onReviewClaim(selectedClaim.id, "rejected")}
                 disabled={!isReviewer || isLoading}
-                className="text-xs w-full"
+                leftIcon={<XCircle className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <XCircle className="w-3.5 h-3.5 mr-1" />
                 Reject
               </Button>
             </div>
           </div>
         ) : (
-          <p className="text-xs text-text-muted font-mono text-center py-4">
-            Select any claim card to inspect details and apply review actions.
+          <p className="text-xs text-slate-500 text-center py-4">
+            Select any claim on the left to inspect or apply actions.
           </p>
         )}
       </div>
 
       {/* Big Handover Final Approval CTA */}
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-4 space-y-3">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
         <div>
-          <span className="text-xs font-mono font-bold uppercase text-emerald-400 block">
-            Final Handover Publication
+          <span className="text-sm font-semibold text-emerald-900 block">
+            Publish Handover
           </span>
-          <p className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-            Approving generates <strong className="text-text-primary font-mono">DraftVersion v2.0</strong>, recalculates final confidence, and publishes role-specific onboarding plans for incoming leads and interns.
+          <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+            Publishing creates the approved handover version and delivers
+            role-scoped continuation plans to incoming team members.
           </p>
         </div>
 
         <Button
           variant="approve"
-          size="md"
           onClick={handleApproveHandoverClick}
           disabled={!isReviewer || isLoading || isApprovingHandover}
           isLoading={isApprovingHandover}
-          className="w-full text-xs font-bold bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-950/40"
+          className="w-full"
         >
           {!isReviewer ? (
             <>
-              <Lock className="w-3.5 h-3.5 mr-1.5" />
+              <Lock className="w-4 h-4 mr-1.5" />
               Locked (Reviewer Only)
             </>
+          ) : cleanMode ? (
+            "✓ Approve & Publish Handover →"
           ) : (
-            <>
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-              Approve & Publish Handover (v2.0)
-            </>
+            "Approve & Publish Handover (v2.0)"
           )}
         </Button>
       </div>

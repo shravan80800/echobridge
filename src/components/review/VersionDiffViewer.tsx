@@ -5,14 +5,10 @@ import {
   GitCompare,
   Plus,
   Minus,
-  CheckCircle2,
   TrendingUp,
-  Layers,
   ArrowRight,
-  Filter,
-  Sparkles,
 } from "lucide-react";
-import type { VersionDiffSummary, ClaimDiffItem } from "@/services/workflow/review.service";
+import type { VersionDiffSummary } from "@/services/workflow/review.service";
 import type { VersionLabel } from "@/types/echobridge.types";
 import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
 
@@ -21,6 +17,7 @@ interface VersionDiffViewerProps {
   fromVersion: VersionLabel;
   toVersion: VersionLabel;
   onSelectVersions: (from: VersionLabel, to: VersionLabel) => void;
+  hideClaimIds?: boolean;
   isLoading?: boolean;
 }
 
@@ -29,20 +26,27 @@ export function VersionDiffViewer({
   fromVersion,
   toVersion,
   onSelectVersions,
-  isLoading = false,
+  hideClaimIds = false,
 }: VersionDiffViewerProps) {
-  const [filterMode, setFilterMode] = useState<"all" | "modified" | "unchanged">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "modified" | "unchanged">(
+    "all"
+  );
 
   if (!diff) {
     return (
-      <div className="rounded-xl border border-border-subtle bg-surface p-8 text-center text-text-muted font-mono text-xs">
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 text-sm">
         No version diff available for {fromVersion} → {toVersion}.
       </div>
     );
   }
 
   const items = diff.items.filter((item) => {
-    if (filterMode === "modified") return item.changeType === "modified" || item.changeType === "added" || item.changeType === "removed";
+    if (filterMode === "modified")
+      return (
+        item.changeType === "modified" ||
+        item.changeType === "added" ||
+        item.changeType === "removed"
+      );
     if (filterMode === "unchanged") return item.changeType === "unchanged";
     return true;
   });
@@ -50,148 +54,166 @@ export function VersionDiffViewer({
   return (
     <div className="space-y-4">
       {/* Top Controls & Version Selector Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-surface border border-border-subtle">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2">
-          <GitCompare className="w-4 h-4 text-accent-cyan" />
-          <span className="text-xs font-mono font-bold uppercase text-text-primary">
-            Handover Snapshot Comparison:
+          <GitCompare className="w-4 h-4 text-teal-700 shrink-0" />
+          <span className="text-sm font-semibold text-slate-900">
+            Version Comparison
           </span>
         </div>
 
-        {/* Comparison Presets */}
-        <div className="flex items-center gap-1.5 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => onSelectVersions("v1.0", "v1.1")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
               fromVersion === "v1.0" && toVersion === "v1.1"
-                ? "bg-accent-primary text-white font-bold"
-                : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300 font-medium"
             }`}
           >
-            v1.0 → v1.1 (Gap-Interview)
+            v1.0 → v1.1 (After Interview)
           </button>
 
           <button
             type="button"
             onClick={() => onSelectVersions("v1.1", "v2.0")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
               fromVersion === "v1.1" && toVersion === "v2.0"
-                ? "bg-accent-primary text-white font-bold"
-                : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300 font-medium"
             }`}
           >
-            v1.1 → v2.0 (Reviewer Approvals)
+            v1.1 → v2.0 (Reviewer Edits)
           </button>
 
           <button
             type="button"
             onClick={() => onSelectVersions("v1.0", "v2.0")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
               fromVersion === "v1.0" && toVersion === "v2.0"
-                ? "bg-accent-primary text-white font-bold"
-                : "bg-canvas text-text-secondary hover:text-text-primary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300 font-medium"
             }`}
           >
-            v1.0 → v2.0 (Full Lifecycle)
+            v1.0 → v2.0 (All Changes)
           </button>
         </div>
       </div>
 
       {/* Diff Metrics Banner */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 font-mono">
-        <div className="p-3 rounded-xl bg-surface border border-border-subtle">
-          <span className="text-[10px] text-text-muted uppercase block">Modified Claims</span>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">
+            Modified Claims
+          </span>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-bold text-amber-400">~{diff.modifiedCount}</span>
-            <span className="text-xs text-text-muted">claims</span>
+            <span className="text-xl font-bold text-amber-700">
+              ~{diff.modifiedCount}
+            </span>
+            <span className="text-xs text-slate-500">claims</span>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-surface border border-border-subtle">
-          <span className="text-[10px] text-text-muted uppercase block">Added Claims</span>
+        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">
+            Added Claims
+          </span>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-bold text-emerald-400">+{diff.addedCount}</span>
-            <span className="text-xs text-text-muted">claims</span>
+            <span className="text-xl font-bold text-emerald-700">
+              +{diff.addedCount}
+            </span>
+            <span className="text-xs text-slate-500">claims</span>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-surface border border-border-subtle">
-          <span className="text-[10px] text-text-muted uppercase block">Removed Claims</span>
+        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">
+            Removed Claims
+          </span>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-bold text-rose-400">-{diff.removedCount}</span>
-            <span className="text-xs text-text-muted">claims</span>
+            <span className="text-xl font-bold text-rose-700">
+              -{diff.removedCount}
+            </span>
+            <span className="text-xs text-slate-500">claims</span>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-surface border border-border-subtle">
-          <span className="text-[10px] text-text-muted uppercase block">Unchanged Claims</span>
+        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">
+            Unchanged Claims
+          </span>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-bold text-text-secondary">={diff.unchangedCount}</span>
-            <span className="text-xs text-text-muted">claims</span>
+            <span className="text-xl font-bold text-slate-700">
+              ={diff.unchangedCount}
+            </span>
+            <span className="text-xs text-slate-500">claims</span>
           </div>
         </div>
 
-        <div className="p-3 rounded-xl bg-surface border border-accent-cyan/30">
-          <span className="text-[10px] text-accent-cyan uppercase block font-bold">
+        <div className="p-3.5 rounded-xl bg-teal-50 border border-teal-200 shadow-sm col-span-2 md:col-span-1">
+          <span className="text-xs font-semibold text-teal-800 block">
             Confidence Delta
           </span>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-bold text-accent-cyan">
+            <span className="text-xl font-bold text-teal-900">
               {diff.confidenceScoreChange.to}%
             </span>
-            <span className="text-xs text-emerald-400 font-bold flex items-center">
-              <TrendingUp className="w-3 h-3 mr-0.5 inline" />
-              {diff.confidenceScoreChange.delta >= 0 ? `+${diff.confidenceScoreChange.delta}%` : `${diff.confidenceScoreChange.delta}%`}
+            <span className="text-xs text-emerald-700 font-semibold inline-flex items-center">
+              <TrendingUp className="w-3 h-3 mr-0.5 shrink-0" />
+              {diff.confidenceScoreChange.delta >= 0
+                ? `+${diff.confidenceScoreChange.delta}%`
+                : `${diff.confidenceScoreChange.delta}%`}
             </span>
           </div>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => setFilterMode("all")}
-            className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               filterMode === "all"
-                ? "bg-surface-hover text-accent-cyan font-bold"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-teal-50 text-teal-800 border border-teal-200 font-semibold"
+                : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            All Items ({diff.totalCount})
+            All ({diff.totalCount})
           </button>
           <button
             type="button"
             onClick={() => setFilterMode("modified")}
-            className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               filterMode === "modified"
-                ? "bg-amber-500/20 text-amber-300 font-bold"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-amber-50 text-amber-800 border border-amber-200 font-semibold"
+                : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            Changes Only ({diff.modifiedCount + diff.addedCount + diff.removedCount})
+            Changes Only (
+            {diff.modifiedCount + diff.addedCount + diff.removedCount})
           </button>
           <button
             type="button"
             onClick={() => setFilterMode("unchanged")}
-            className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               filterMode === "unchanged"
-                ? "bg-surface-hover text-text-secondary font-bold"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-slate-200 text-slate-900 font-semibold"
+                : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             Unchanged ({diff.unchangedCount})
           </button>
         </div>
 
-        <span className="text-[11px] font-mono text-text-muted">
+        <span className="text-xs text-slate-500">
           Showing {items.length} claim(s)
         </span>
       </div>
 
-      {/* Git-Style Inline Diff List */}
+      {/* Inline Diff List */}
       <div className="space-y-3">
         {items.map((item) => {
           const isModified = item.changeType === "modified";
@@ -201,71 +223,74 @@ export function VersionDiffViewer({
           return (
             <div
               key={item.claimId}
-              className={`rounded-xl border p-4 transition-all ${
+              className={`rounded-xl border p-4 bg-white shadow-sm ${
                 isModified
-                  ? "border-amber-500/30 bg-surface shadow-sm"
+                  ? "border-amber-300"
                   : isAdded
-                  ? "border-emerald-500/30 bg-emerald-950/10"
+                  ? "border-emerald-300"
                   : isRemoved
-                  ? "border-rose-500/30 bg-rose-950/10"
-                  : "border-border-subtle bg-surface/50 opacity-80"
+                  ? "border-rose-300"
+                  : "border-slate-200"
               }`}
             >
               {/* Diff Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle/60 pb-2 mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 mb-3">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize border cursor-default select-none ${
                       isModified
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
                         : isAdded
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                         : isRemoved
-                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                        : "bg-surface text-text-muted border border-border-subtle"
+                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                        : "bg-slate-100 text-slate-700 border-slate-200"
                     }`}
                   >
                     {item.changeType}
                   </span>
-                  <span className="text-xs font-mono text-text-muted">
-                    {item.claimId}
-                  </span>
+                  {!hideClaimIds && (
+                    <span className="text-xs font-mono text-slate-500">
+                      {item.claimId}
+                    </span>
+                  )}
                 </div>
 
                 {/* State Transition Indicator */}
                 {isModified && item.stateDiff?.isModified && (
-                  <div className="flex items-center gap-1.5 text-xs font-mono">
+                  <div className="flex items-center gap-1.5 text-xs">
                     <EvidenceBadge state={item.stateDiff.oldState} size="sm" />
-                    <ArrowRight className="w-3 h-3 text-text-muted" />
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <EvidenceBadge state={item.stateDiff.newState} size="sm" />
                   </div>
                 )}
 
                 {item.newClaim && !item.stateDiff?.isModified && (
-                  <EvidenceBadge state={item.newClaim.evidence_state} size="sm" />
+                  <EvidenceBadge
+                    state={item.newClaim.evidence_state}
+                    size="sm"
+                  />
                 )}
               </div>
 
               {/* Text Diff Body */}
-              <div className="space-y-2 font-mono text-xs">
+              <div className="space-y-2 text-xs sm:text-sm">
                 {isModified ? (
                   <>
-                    {/* Old Version Line (Red) */}
-                    <div className="p-2.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300 flex items-start gap-2">
-                      <Minus className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-2">
+                      <Minus className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                       <div className="leading-relaxed">
-                        <span className="text-[10px] text-rose-400 font-bold block mb-0.5">
+                        <span className="text-xs text-rose-700 font-semibold block mb-0.5">
                           {diff.fromVersion}:
                         </span>
                         <span>{item.textDiff?.oldText}</span>
                       </div>
                     </div>
 
-                    {/* New Version Line (Green) */}
-                    <div className="p-2.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 flex items-start gap-2">
-                      <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-2">
+                      <Plus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="leading-relaxed">
-                        <span className="text-[10px] text-emerald-400 font-bold block mb-0.5">
+                        <span className="text-xs text-emerald-700 font-semibold block mb-0.5">
                           {diff.toVersion}:
                         </span>
                         <span>{item.textDiff?.newText}</span>
@@ -273,21 +298,21 @@ export function VersionDiffViewer({
                     </div>
                   </>
                 ) : isAdded ? (
-                  <div className="p-2.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 flex items-start gap-2">
-                    <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-2">
+                    <Plus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
                       <span>{item.textDiff?.newText}</span>
                     </div>
                   </div>
                 ) : isRemoved ? (
-                  <div className="p-2.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300 line-through flex items-start gap-2">
-                    <Minus className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 line-through flex items-start gap-2">
+                    <Minus className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <div className="leading-relaxed">
                       <span>{item.textDiff?.oldText}</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-2.5 rounded bg-canvas border border-border-subtle text-text-secondary">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
                     <span>{item.textDiff?.newText}</span>
                   </div>
                 )}

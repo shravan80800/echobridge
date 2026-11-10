@@ -1,33 +1,16 @@
-"use strict";
-/**
- * Stage 3 UI — Evidence-Coloured Draft (Figure 4 Alignment)
- * Implements Concept Mockup Figure 4 (Page 8 of Round 1 Proposal) and TASKS.md TASK-016.
- *
- * 2-Column Layout matching Figure 4:
- * - Left: Clean colour-coded claim rows grouped by section with accessible EvidenceBadge
- * - Right: Sticky Evidence & Confidence Panel with 4 transparent heuristic weights + state filters
- * - Dedicated clean tabs for Decision Timeline ("Why" Cards) and Context Web Graph
- */
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  FileCheck,
   Shield,
-  Layers,
-  ArrowRight,
-  RefreshCw,
-  Search,
   Lock,
   Unlock,
   CheckCircle2,
-  AlertTriangle,
-  Eye,
+  Search,
   FileText,
-  SlidersHorizontal,
-  ChevronDown,
+  Layers,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { LoadingSkeleton, ErrorBanner } from "@/components/ui/StateViews";
@@ -42,37 +25,33 @@ import type {
   ClaimRecord,
   DraftVersion,
   EvidenceRecord,
-  EvidenceState,
 } from "@/types/echobridge.types";
 
 export default function DraftPage() {
   const { currentRole } = useRole();
 
-  // Selected Audience View (Lead vs Intern)
   const [selectedAudience, setSelectedAudience] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
   );
 
   const [loading, setLoading] = useState(true);
-  const [reconstructing, setReconstructing] = useState(false);
   const [leadDraft, setLeadDraft] = useState<DraftVersion | null>(null);
   const [internDraft, setInternDraft] = useState<DraftVersion | null>(null);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
-  // Filters & Tabs
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedState, setSelectedState] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"draft" | "timeline" | "graph">("draft");
-  const [showWeightBreakdown, setShowWeightBreakdown] = useState(true);
+  const [activeTab, setActiveTab] = useState<"draft" | "timeline" | "graph">(
+    "draft"
+  );
 
-  // Citation Popover state
-  const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceRecord | null>(null);
+  const [inspectedEvidence, setInspectedEvidence] =
+    useState<EvidenceRecord | null>(null);
   const [inspectedChunk, setInspectedChunk] = useState<Chunk | null>(null);
   const [inspectedClaimText, setInspectedClaimText] = useState<string>("");
 
-  // Sync selected audience when judge switches role in command bar
   useEffect(() => {
     if (currentRole === "incoming_intern") {
       setSelectedAudience("incoming_intern");
@@ -112,48 +91,16 @@ export default function DraftPage() {
     fetchDraftData();
   }, [fetchDraftData]);
 
-  const handleReconstruct = async () => {
-    try {
-      setReconstructing(true);
-      setError(null);
-      const res = await fetch("/api/reconstruct", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: "CampusConnect",
-          audienceRole: "both",
-          showRestrictedPlaceholders: true,
-        }),
-      });
-
-      const json = await res.json();
-      if (!json.success) {
-        throw new Error(json.error || "Reconstruction failed");
-      }
-
-      setLeadDraft(json.data.leadDraft.draftVersion);
-      setInternDraft(json.data.internDraft.draftVersion);
-      setSuccessBanner(
-        "Trust Pipeline re-run successfully! Separate Lead and Intern drafts generated."
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Reconstruction failed");
-    } finally {
-      setReconstructing(false);
-    }
-  };
-
   const activeDraft =
     selectedAudience === "incoming_lead" ? leadDraft : internDraft;
 
   const chunksMap = new Map<string, Chunk>(chunks.map((c) => [c.id, c]));
   const rawClaims = activeDraft?.claims || [];
 
-  // Filter claims
   const filteredClaims = rawClaims.filter((claim) => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      if (!claim.text.toLowerCase().includes(q) && !claim.id.toLowerCase().includes(q)) {
+      if (!claim.text.toLowerCase().includes(q)) {
         return false;
       }
     }
@@ -163,7 +110,6 @@ export default function DraftPage() {
     return true;
   });
 
-  // Group claims by section for clean Figure 4 layout
   const sections = [
     { key: "architecture", label: "Architecture & Framework" },
     { key: "decisions", label: "Decisions & Strategy" },
@@ -175,31 +121,54 @@ export default function DraftPage() {
   const getSectionForClaim = (claim: ClaimRecord) => {
     const text = claim.text.toLowerCase();
     const sec = claim.section?.toLowerCase() || "";
-    if (sec.includes("arch") || text.includes("next.js") || text.includes("architecture")) {
+    if (
+      sec.includes("arch") ||
+      text.includes("next.js") ||
+      text.includes("architecture")
+    ) {
       return "architecture";
     }
-    if (sec.includes("decis") || text.includes("deadline") || text.includes("redis")) {
+    if (
+      sec.includes("decis") ||
+      text.includes("deadline") ||
+      text.includes("redis")
+    ) {
       return "decisions";
     }
-    if (sec.includes("runbook") || sec.includes("operat") || text.includes("deployment") || text.includes("runbook") || text.includes("docker")) {
+    if (
+      sec.includes("runbook") ||
+      sec.includes("operat") ||
+      text.includes("deployment") ||
+      text.includes("runbook") ||
+      text.includes("docker")
+    ) {
       return "operations";
     }
-    if (sec.includes("finan") || text.includes("budget") || text.includes("sponsorship") || claim.evidence_state === "restricted") {
+    if (
+      sec.includes("finan") ||
+      text.includes("budget") ||
+      text.includes("sponsorship") ||
+      claim.evidence_state === "restricted"
+    ) {
       return "finance";
     }
     return "open_questions";
   };
 
-  // State Counts for Sidebar Legend
   const stateCounts: Record<string, number> = {
     all: rawClaims.length,
-    corroborated: rawClaims.filter((c) => c.evidence_state === "corroborated").length,
-    single_source: rawClaims.filter((c) => c.evidence_state === "single_source").length,
+    corroborated: rawClaims.filter((c) => c.evidence_state === "corroborated")
+      .length,
+    single_source: rawClaims.filter((c) => c.evidence_state === "single_source")
+      .length,
     attested: rawClaims.filter((c) => c.evidence_state === "attested").length,
     stale: rawClaims.filter((c) => c.evidence_state === "stale").length,
-    conflicting: rawClaims.filter((c) => c.evidence_state === "conflicting").length,
-    unsupported: rawClaims.filter((c) => c.evidence_state === "unsupported").length,
-    restricted: rawClaims.filter((c) => c.evidence_state === "restricted").length,
+    conflicting: rawClaims.filter((c) => c.evidence_state === "conflicting")
+      .length,
+    unsupported: rawClaims.filter((c) => c.evidence_state === "unsupported")
+      .length,
+    restricted: rawClaims.filter((c) => c.evidence_state === "restricted")
+      .length,
   };
 
   const handleOpenCitation = (
@@ -216,106 +185,94 @@ export default function DraftPage() {
   const totalScore = confidence?.total_score ?? 76;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <main className="w-full space-y-6">
       {/* ==================================================================== */}
       {/* 1. CLEAN PAGE HEADER                                                 */}
       {/* ==================================================================== */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border-subtle">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-accent-primary/10 text-accent-cyan border border-accent-primary/20">
-              Stage 3
-            </span>
-            <span className="text-text-muted text-xs font-mono">
-              The Trust Pipeline
-            </span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary">
-            3. Evidence-Coloured Handover Draft
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Evidence-Verified Handover Draft
           </h1>
-
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-            Atomic claims synthesized through retrieve-only generation and verified by
-            our two-layer citation verifier.
+          <p className="text-sm text-slate-600 mt-1">
+            Review how every statement is backed by exact project quotes, dates, and access permissions.
           </p>
         </div>
 
-        {/* Audience Scope Toggle & Primary CTA */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          {/* Audience Switcher Segmented Control */}
-          <div className="flex items-center p-1 rounded-xl bg-canvas border border-border-subtle text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => setSelectedAudience("incoming_lead")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                selectedAudience === "incoming_lead"
-                  ? "bg-indigo-600 text-white font-bold shadow-sm"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title="Team Lead View (Full Scope including Finance)"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Team Lead Scope</span>
-              <span className="sr-only">Team Lead View</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedAudience("incoming_intern")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                selectedAudience === "incoming_intern"
-                  ? "bg-cyan-600 text-white font-bold shadow-sm"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title="Intern View (Restricted Scope — Finance Masked)"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Intern Scope</span>
-              <span className="sr-only">Intern View</span>
-            </button>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Link href="/interview">
-            <Button variant="primary" size="sm" className="text-xs font-mono">
-              Proceed to Gap-Interview (Stage 4) →
-            </Button>
+            <Button variant="primary">Continue to Gap Interview →</Button>
+          </Link>
+
+          <Link href="/review">
+            <Button variant="secondary">Go to Review &amp; Approve →</Button>
           </Link>
         </div>
       </div>
 
-      {/* Scope Notice Banner */}
-      <div className="px-4 py-2 rounded-xl bg-canvas border border-border-subtle text-xs font-mono flex items-center justify-between text-text-secondary">
-        <div className="flex items-center gap-2">
+      {/* Audience Scope Switcher & Notice Strip */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm">
           {selectedAudience === "incoming_lead" ? (
-            <span className="text-indigo-300 flex items-center gap-1.5 font-bold">
-              <Unlock className="w-3.5 h-3.5 text-indigo-400" />
-              Full Scope: Architecture, Runbooks, Tasks, and Confidential Finance ($3,500)
+            <span className="inline-flex items-center gap-2 text-slate-800 font-medium">
+              <Unlock className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Team Lead View:</strong> Includes architecture, operations, and confidential budget notes.
+              </span>
             </span>
           ) : (
-            <span className="text-cyan-300 flex items-center gap-1.5 font-bold">
-              <Lock className="w-3.5 h-3.5 text-cyan-400" />
-              Restricted Scope: Confidential Finance is 100% masked pre-model and post-generation
+            <span className="inline-flex items-center gap-2 text-slate-800 font-medium">
+              <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>
+                <strong>Intern View:</strong> Restricted financial documents are hidden automatically.
+              </span>
             </span>
           )}
         </div>
-        <span className="text-text-muted text-[11px] hidden sm:inline">
-          Dual-Barrier RBAC Active
-        </span>
+
+        {/* Segmented Control */}
+        <div className="inline-flex items-center p-1 rounded-lg bg-slate-100 border border-slate-200 text-xs shrink-0 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={() => setSelectedAudience("incoming_lead")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+              selectedAudience === "incoming_lead"
+                ? "bg-white text-slate-900 font-semibold shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5 text-teal-700" />
+            <span>Team Lead View</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAudience("incoming_intern")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+              selectedAudience === "incoming_intern"
+                ? "bg-white text-slate-900 font-semibold shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-700" />
+            <span>Intern View</span>
+          </button>
+        </div>
       </div>
 
-      {/* Success / Error Messages */}
+      {/* Banners */}
       {successBanner && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>{successBanner}</span>
           </div>
           <button
+            type="button"
             onClick={() => setSuccessBanner(null)}
-            className="text-emerald-400/70 hover:text-emerald-400 font-mono text-xs"
+            className="text-emerald-700 hover:text-emerald-900 font-semibold text-xs cursor-pointer"
           >
-            ✕
+            Dismiss
           </button>
         </div>
       )}
@@ -323,22 +280,28 @@ export default function DraftPage() {
       {error && <ErrorBanner message={error} onRetry={fetchDraftData} />}
 
       {/* ==================================================================== */}
-      {/* 2. CLEAN VIEW SWITCHER TABS                                          */}
+      {/* 2. VIEW SWITCHER TABS & SEARCH                                       */}
       {/* ==================================================================== */}
-      <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setActiveTab("draft")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-colors cursor-pointer ${
               activeTab === "draft"
-                ? "bg-accent-primary text-white shadow-md shadow-indigo-500/20"
-                : "bg-surface hover:bg-surface-hover text-text-secondary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>📄 Evidence-Coloured Draft</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-200">
+            <FileText className="w-4 h-4" />
+            <span>Handover Draft</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === "draft"
+                  ? "bg-teal-800 text-teal-100"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
               {rawClaims.length}
             </span>
           </button>
@@ -346,79 +309,78 @@ export default function DraftPage() {
           <button
             type="button"
             onClick={() => setActiveTab("timeline")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-colors cursor-pointer ${
               activeTab === "timeline"
-                ? "bg-accent-primary text-white shadow-md shadow-indigo-500/20"
-                : "bg-surface hover:bg-surface-hover text-text-secondary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-4 h-4" />
             <span>Decision Timeline</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("graph")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-colors cursor-pointer ${
               activeTab === "graph"
-                ? "bg-accent-primary text-white shadow-md shadow-indigo-500/20"
-                : "bg-surface hover:bg-surface-hover text-text-secondary border border-border-subtle"
+                ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
             }`}
           >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Context Web Graph</span>
+            <Eye className="w-4 h-4" />
+            <span>Knowledge Connections</span>
           </button>
         </div>
 
-        {/* Search Input for claims */}
         {activeTab === "draft" && (
-          <div className="relative hidden md:block w-64">
-            <Search className="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search claims..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface border border-border-subtle text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary font-mono placeholder:text-text-muted"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 placeholder:text-slate-400"
             />
           </div>
         )}
       </div>
 
-      {/* Loading Skeleton */}
+      {/* Loading or Active Content */}
       {loading ? (
         <LoadingSkeleton
           cardCount={3}
-          message="Synthesizing atomic claims and verifying two-layer citations..."
+          message="Loading verified claims and source citations..."
         />
       ) : activeTab === "timeline" ? (
-        /* Tab 2: Decision Timeline */
         <DecisionTimeline audienceRole={selectedAudience} />
       ) : activeTab === "graph" ? (
-        /* Tab 3: Context Web Graph */
         <ContextWebGraph audienceRole={selectedAudience} />
       ) : (
         /* ================================================================== */
-        /* TAB 1: EXACT 2-COLUMN LAYOUT MATCHING FIGURE 4                     */
+        /* TAB 1: FIGURE 4 TWO-COLUMN LAYOUT                                  */
         /* ================================================================== */
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Clean Colour-Coded Claim Rows Grouped by Section */}
-          <div className="flex-1 space-y-6 w-full">
+          <div className="lg:col-span-8 space-y-6">
             {sections.map((sec) => {
               const secClaims = filteredClaims.filter(
                 (c) => getSectionForClaim(c) === sec.key
               );
-
               if (secClaims.length === 0) return null;
 
               return (
-                <div key={sec.key} className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                <div
+                  key={sec.key}
+                  className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm space-y-3"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h2 className="text-sm font-bold text-slate-900">
                       {sec.label}
                     </h2>
-                    <span className="text-[10px] font-mono text-text-muted">
-                      {secClaims.length} claim{secClaims.length !== 1 ? "s" : ""}
+                    <span className="text-xs text-slate-500">
+                      {secClaims.length} item{secClaims.length !== 1 ? "s" : ""}
                     </span>
                   </div>
 
@@ -437,127 +399,122 @@ export default function DraftPage() {
             })}
 
             {filteredClaims.length === 0 && (
-              <div className="p-8 rounded-xl bg-surface border border-border-subtle text-center space-y-2">
-                <p className="text-xs text-text-muted font-mono">
-                  No claims match the filter: &ldquo;{selectedState}&rdquo;
+              <div className="p-8 rounded-xl bg-white border border-slate-200 text-center space-y-3 shadow-sm">
+                <p className="text-sm text-slate-600">
+                  No claims match the current filter.
                 </p>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => {
                     setSelectedState("all");
                     setSearchQuery("");
                   }}
-                  className="text-xs font-mono text-accent-cyan hover:underline"
                 >
-                  Reset all filters
-                </button>
+                  Reset filters
+                </Button>
               </div>
             )}
           </div>
 
-          {/* Right Sticky Sidebar: Figure 4 Evidence & Confidence Panel (w-80) */}
-          <div className="w-full lg:w-80 shrink-0 space-y-4 lg:sticky lg:top-20">
-            {/* Confidence Score Pill & Breakdown Box */}
-            <div className="p-4 rounded-xl bg-surface border border-border-subtle space-y-3 shadow-sm">
-              <div className="flex items-center justify-between">
+          {/* Right Sticky Sidebar: Confidence Pill + Evidence Legend */}
+          <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-20">
+            {/* Confidence Score Card */}
+            <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block font-bold">
+                  <span className="text-sm font-bold text-slate-900 block">
                     Confidence Score
                   </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span
-                      className={`text-2xl font-bold font-mono ${
-                        totalScore >= 80
-                          ? "text-emerald-400"
-                          : totalScore >= 60
-                          ? "text-amber-400"
-                          : "text-rose-400"
-                      }`}
-                    >
-                      {totalScore}%
-                    </span>
-                    <span className="text-[10px] font-mono text-text-muted">
-                      Heuristic
-                    </span>
-                  </div>
+                  <span className="text-xs text-slate-500">
+                    Based on verified citations
+                  </span>
                 </div>
 
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border uppercase tracking-wider ${
-                    totalScore >= 80
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                      : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                  }`}
-                >
-                  {totalScore >= 80 ? "High Trust" : "Attestation Required"}
+                <span className="bg-teal-700 text-white rounded-full px-3.5 py-1 text-xs font-semibold cursor-default select-none">
+                  Confidence {totalScore}%
                 </span>
               </div>
 
-              {/* 4 Transparent Heuristic Weights (Figure 4) */}
-              <div className="space-y-2 pt-2 border-t border-border-subtle text-[11px] font-mono">
+              <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
                 <div>
-                  <div className="flex justify-between text-text-muted mb-1">
-                    <span>40% Citation Coverage</span>
-                    <span className="text-text-primary">
-                      {Math.round((confidence?.citation_coverage ?? 0.82) * 100)}%
+                  <div className="flex justify-between text-slate-700 mb-1">
+                    <span>Citation Coverage</span>
+                    <span className="font-semibold text-slate-900">
+                      {Math.round((confidence?.citation_coverage ?? 0.82) * 100)}
+                      %
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full bg-emerald-400"
+                      className="h-full bg-teal-600 rounded-full"
                       style={{
-                        width: `${Math.round((confidence?.citation_coverage ?? 0.82) * 100)}%`,
+                        width: `${Math.round(
+                          (confidence?.citation_coverage ?? 0.82) * 100
+                        )}%`,
                       }}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-text-muted mb-1">
-                    <span>25% Corroboration Rate</span>
-                    <span className="text-text-primary">
-                      {Math.round((confidence?.corroboration_rate ?? 0.55) * 100)}%
+                  <div className="flex justify-between text-slate-700 mb-1">
+                    <span>Corroboration</span>
+                    <span className="font-semibold text-slate-900">
+                      {Math.round(
+                        (confidence?.corroboration_rate ?? 0.55) * 100
+                      )}
+                      %
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full bg-indigo-400"
+                      className="h-full bg-emerald-600 rounded-full"
                       style={{
-                        width: `${Math.round((confidence?.corroboration_rate ?? 0.55) * 100)}%`,
+                        width: `${Math.round(
+                          (confidence?.corroboration_rate ?? 0.55) * 100
+                        )}%`,
                       }}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-text-muted mb-1">
-                    <span>15% Freshness</span>
-                    <span className="text-text-primary">
+                  <div className="flex justify-between text-slate-700 mb-1">
+                    <span>Freshness</span>
+                    <span className="font-semibold text-slate-900">
                       {Math.round((confidence?.freshness_rate ?? 0.73) * 100)}%
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full bg-amber-400"
+                      className="h-full bg-amber-500 rounded-full"
                       style={{
-                        width: `${Math.round((confidence?.freshness_rate ?? 0.73) * 100)}%`,
+                        width: `${Math.round(
+                          (confidence?.freshness_rate ?? 0.73) * 100
+                        )}%`,
                       }}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-text-muted mb-1">
-                    <span>20% Non-Conflict</span>
-                    <span className="text-text-primary">
-                      {Math.round((confidence?.conflict_free_rate ?? 0.91) * 100)}%
+                  <div className="flex justify-between text-slate-700 mb-1">
+                    <span>Non-Conflict</span>
+                    <span className="font-semibold text-slate-900">
+                      {Math.round(
+                        (confidence?.conflict_free_rate ?? 0.91) * 100
+                      )}
+                      %
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full bg-cyan-400"
+                      className="h-full bg-purple-600 rounded-full"
                       style={{
-                        width: `${Math.round((confidence?.conflict_free_rate ?? 0.91) * 100)}%`,
+                        width: `${Math.round(
+                          (confidence?.conflict_free_rate ?? 0.91) * 100
+                        )}%`,
                       }}
                     />
                   </div>
@@ -565,173 +522,91 @@ export default function DraftPage() {
               </div>
             </div>
 
-            {/* Evidence State Filter / Legend List (Figure 4) */}
-            <div className="p-4 rounded-xl bg-surface border border-border-subtle space-y-2.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block font-bold">
-                Evidence States Filter
+            {/* Evidence Legend Filter Box */}
+            <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+              <span className="text-sm font-bold text-slate-900 block">
+                Evidence Legend
               </span>
 
-              <div className="space-y-1 text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("all")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "all"
-                      ? "bg-accent-primary text-white font-bold"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span>All Claims</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-canvas text-text-muted">
-                    {stateCounts.all}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("corroborated")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "corroborated"
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span>Corroborated</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-bold">
-                    {stateCounts.corroborated}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("single_source")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "single_source"
-                      ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    <span>Single-Source</span>
-                  </span>
-                  <span className="text-[10px] text-amber-400 font-bold">
-                    {stateCounts.single_source}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("attested")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "attested"
-                      ? "bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                    <span>Attested</span>
-                  </span>
-                  <span className="text-[10px] text-cyan-400 font-bold">
-                    {stateCounts.attested}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("stale")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "stale"
-                      ? "bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-orange-400" />
-                    <span>Stale (&gt;180d)</span>
-                  </span>
-                  <span className="text-[10px] text-orange-400 font-bold">
-                    {stateCounts.stale}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("conflicting")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "conflicting"
-                      ? "bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-400" />
-                    <span>Conflicting</span>
-                  </span>
-                  <span className="text-[10px] text-purple-400 font-bold">
-                    {stateCounts.conflicting}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedState("unsupported")}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                    selectedState === "unsupported"
-                      ? "bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30"
-                      : "text-text-secondary hover:bg-surface-hover"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-rose-400" />
-                    <span>Unsupported</span>
-                  </span>
-                  <span className="text-[10px] text-rose-400 font-bold">
-                    {stateCounts.unsupported}
-                  </span>
-                </button>
-
-                {selectedAudience === "incoming_intern" && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedState("restricted")}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all ${
-                      selectedState === "restricted"
-                        ? "bg-slate-700/40 text-slate-300 font-bold border border-slate-600"
-                        : "text-text-secondary hover:bg-surface-hover"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Lock className="w-3 h-3 text-slate-400" />
-                      <span>Restricted</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-bold">
-                      {stateCounts.restricted}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Planted Traps HUD Box */}
-            <div className="p-3.5 rounded-xl bg-canvas border border-border-subtle text-[11px] font-mono space-y-1.5">
-              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider block">
-                Planted Traps Verification HUD
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                  Trap 1: Conflict
-                </span>
-                <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30">
-                  Trap 2: Gap
-                </span>
-                <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-300 border border-orange-500/30">
-                  Trap 3: Stale
-                </span>
+              <div className="space-y-1 text-xs">
+                {[
+                  {
+                    key: "all",
+                    label: "All Claims",
+                    dot: "bg-slate-400",
+                    count: stateCounts.all,
+                  },
+                  {
+                    key: "corroborated",
+                    label: "Corroborated (2+ sources)",
+                    dot: "bg-emerald-500",
+                    count: stateCounts.corroborated,
+                  },
+                  {
+                    key: "single_source",
+                    label: "Single-source",
+                    dot: "bg-amber-500",
+                    count: stateCounts.single_source,
+                  },
+                  {
+                    key: "attested",
+                    label: "Attested",
+                    dot: "bg-blue-500",
+                    count: stateCounts.attested,
+                  },
+                  {
+                    key: "stale",
+                    label: "Stale (> 6 months)",
+                    dot: "bg-orange-500",
+                    count: stateCounts.stale,
+                  },
+                  {
+                    key: "conflicting",
+                    label: "Conflicting",
+                    dot: "bg-purple-500",
+                    count: stateCounts.conflicting,
+                  },
+                  {
+                    key: "unsupported",
+                    label: "Unsupported",
+                    dot: "bg-rose-500",
+                    count: stateCounts.unsupported,
+                  },
+                  ...(selectedAudience === "incoming_intern"
+                    ? [
+                        {
+                          key: "restricted",
+                          label: "Restricted",
+                          dot: "bg-slate-500",
+                          count: stateCounts.restricted,
+                        },
+                      ]
+                    : []),
+                ].map((item) => {
+                  const active = selectedState === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setSelectedState(item.key)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                        active
+                          ? "bg-teal-50 text-teal-900 font-semibold border border-teal-200"
+                          : "text-slate-700 hover:bg-slate-100 border border-transparent"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.dot}`}
+                        />
+                        <span>{item.label}</span>
+                      </span>
+                      <span className="text-slate-500 font-medium">
+                        {item.count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -746,6 +621,6 @@ export default function DraftPage() {
         chunk={inspectedChunk}
         claimText={inspectedClaimText}
       />
-    </div>
+    </main>
   );
 }
