@@ -542,10 +542,18 @@ export class EchoBridgeRepository {
       .upsert(chunkRows, { onConflict: "id" });
     if (chkErr) console.warn("[Supabase] seed chunks warning:", chkErr.message);
 
-    // 4. Quarantined Secrets
+    // 4. Quarantined Secrets (strictly after chunks; validate chunk_id FK)
+    const seededChunkIds = new Set(data.chunks.map((c) => c.id));
+    const secretRows = data.secrets.map((s) => ({
+      ...s,
+      chunk_id:
+        !chkErr && s.chunk_id && seededChunkIds.has(s.chunk_id)
+          ? s.chunk_id
+          : null,
+    }));
     const { error: secErr } = await client
       .from("quarantined_secrets")
-      .upsert(data.secrets, { onConflict: "id" });
+      .upsert(secretRows, { onConflict: "id" });
     if (secErr) console.warn("[Supabase] seed secrets warning:", secErr.message);
 
     // 5. Draft Versions
@@ -830,10 +838,14 @@ export class EchoBridgeRepository {
             .eq("project_id", projectId)
             .order("detected_at", { ascending: true });
           if (!error && data) {
-            for (const s of data as QuarantinedSecret[]) {
+            const hydrated = (data as QuarantinedSecret[]).map((s) => ({
+              ...s,
+              chunk_id: s.chunk_id || "",
+            }));
+            for (const s of hydrated) {
               this.secrets.set(s.id, s);
             }
-            return data as QuarantinedSecret[];
+            return hydrated;
           }
         }
       } catch (err) {
@@ -851,53 +863,125 @@ export class EchoBridgeRepository {
     return this.listSecrets(projectId);
   }
 
+  private async upsertSecretsToSupabase(
+    client: SupabaseClient,
+    projectId: string,
+    secrets: QuarantinedSecret[]
+  ): Promise<void> {
+    if (secrets.length === 0) return;
+
+    await this.ensureProjectRecord(client, projectId);
+
+    // Collect valid chunk IDs known in memory or present in PostgreSQL chunks table
+    const candidateChunkIds = Array.from(
+      new Set(
+        secrets
+          .map((s) => s.chunk_id?.trim())
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const validChunkIds = new Set<string>();
+    const missingFromMemory: string[] = [];
+    for (const cid of candidateChunkIds) {
+      if (this.chunks.has(cid)) {
+        validChunkIds.add(cid);
+      } else {
+        missingFromMemory.push(cid);
+      }
+    }
+
+    if (missingFromMemory.length > 0) {
+      const { data: existingChunks } = await client
+        .from("chunks")
+        .select("id")
+        .in("id", missingFromMemory);
+      for (const row of (existingChunks || []) as { id: string }[]) {
+        validChunkIds.add(row.id);
+      }
+    }
+
+    const rows = secrets.map((s) => {
+      const cleanChunkId = s.chunk_id?.trim();
+      return {
+        ...s,
+        chunk_id:
+          cleanChunkId && validChunkIds.has(cleanChunkId) ? cleanChunkId : null,
+      };
+    });
+
+    const { error } = await client
+      .from("quarantined_secrets")
+      .upsert(rows, { onConflict: "id" });
+
+    if (
+      error &&
+      (error.code === "23503" ||
+        error.message.includes("quarantined_secrets_chunk_id_fkey"))
+    ) {
+      const fallbackRows = rows.map((r) => ({ ...r, chunk_id: null }));
+      const { error: retryError } = await client
+        .from("quarantined_secrets")
+        .upsert(fallbackRows, { onConflict: "id" });
+      if (retryError) {
+        console.warn("[Supabase] createSecret retry warning:", retryError.message);
+      }
+    } else if (error) {
+      console.warn("[Supabase] createSecret warning:", error.message);
+    }
+  }
+
   public async createSecret(
     secret: QuarantinedSecret
   ): Promise<QuarantinedSecret> {
-    this.secrets.set(secret.id, secret);
+    const normalizedSecret: QuarantinedSecret = {
+      ...secret,
+      chunk_id: secret.chunk_id?.trim() || "",
+    };
+    this.secrets.set(normalizedSecret.id, normalizedSecret);
+
     if (this.isConfigured()) {
       try {
-        await this.ensureProjectSeeded(secret.project_id);
+        await this.ensureProjectSeeded(normalizedSecret.project_id);
         const client = getSupabaseServerClient();
         if (client) {
-          const { error } = await client
-            .from("quarantined_secrets")
-            .upsert(secret, { onConflict: "id" });
-          if (error) {
-            console.warn("[Supabase] createSecret warning:", error.message);
-          }
+          await this.upsertSecretsToSupabase(
+            client,
+            normalizedSecret.project_id,
+            [normalizedSecret]
+          );
         }
       } catch (err) {
         console.warn("[Supabase] createSecret fallback:", err);
       }
     }
-    return secret;
+    return normalizedSecret;
   }
 
   public async createSecrets(
     secrets: QuarantinedSecret[]
   ): Promise<QuarantinedSecret[]> {
-    for (const secret of secrets) {
+    const normalized: QuarantinedSecret[] = secrets.map((s) => ({
+      ...s,
+      chunk_id: s.chunk_id?.trim() || "",
+    }));
+    for (const secret of normalized) {
       this.secrets.set(secret.id, secret);
     }
-    if (this.isConfigured() && secrets.length > 0) {
+
+    if (this.isConfigured() && normalized.length > 0) {
       try {
-        const projectId = secrets[0].project_id;
+        const projectId = normalized[0].project_id;
         await this.ensureProjectSeeded(projectId);
         const client = getSupabaseServerClient();
         if (client) {
-          const { error } = await client
-            .from("quarantined_secrets")
-            .upsert(secrets, { onConflict: "id" });
-          if (error) {
-            console.warn("[Supabase] createSecrets warning:", error.message);
-          }
+          await this.upsertSecretsToSupabase(client, projectId, normalized);
         }
       } catch (err) {
         console.warn("[Supabase] createSecrets fallback:", err);
       }
     }
-    return secrets;
+    return normalized;
   }
 
   // ==========================================================================

@@ -270,6 +270,9 @@ export async function ingestSources(
     );
 
     let sourceChunkCount = 0;
+    const sourceChunks: Chunk[] = [];
+    const sourceSecrets: QuarantinedSecret[] = [];
+    const pendingInjectionAudits: Parameters<typeof logInjectionAudit>[0][] = [];
 
     for (let cIdx = 0; cIdx < rawChunks.length; cIdx++) {
       const rawChunk = rawChunks[cIdx];
@@ -282,11 +285,10 @@ export async function ingestSources(
         projectId
       );
 
-      // Collect any quarantined secrets detected in this chunk
+      // Collect any quarantined secrets detected in this chunk (persist AFTER chunks due to FK)
       for (const secret of redactionResult.quarantinedSecrets) {
         secret.chunk_id = chunkId;
-        quarantinedSecrets.push(secret);
-        await repository.createSecret(secret);
+        sourceSecrets.push(secret);
       }
 
       // 2. Detect & Strip Prompt Injections (Trap 6)
@@ -304,8 +306,8 @@ export async function ingestSources(
           chunkId,
           projectId,
         });
-        quarantinedSecrets.push(quarantinedInj);
-        await repository.createSecret(quarantinedInj);
+        quarantinedInj.chunk_id = chunkId;
+        sourceSecrets.push(quarantinedInj);
 
         // Record injection alert
         injectionAlerts.push({
@@ -315,8 +317,8 @@ export async function ingestSources(
           snippet: injectionResult.detectedInjections[0]?.matchedText || "",
         });
 
-        // Emit immutable audit event
-        await logInjectionAudit({
+        // Queue immutable audit event until chunk & secret are persisted
+        pendingInjectionAudits.push({
           projectId,
           sourceId,
           chunkId,
@@ -346,9 +348,27 @@ export async function ingestSources(
           (injectionResult.injectionFlagged ? 1 : 0),
       };
 
-      await repository.createChunks([chunk]);
-      createdChunks.push(chunk);
+      sourceChunks.push(chunk);
       sourceChunkCount++;
+    }
+
+    // Persist chunks strictly BEFORE quarantined_secrets (quarantined_secrets.chunk_id -> chunks.id FK)
+    if (sourceChunks.length > 0) {
+      await repository.createChunks(sourceChunks);
+      createdChunks.push(...sourceChunks);
+    }
+
+    const persistedChunkIds = new Set(sourceChunks.map((c) => c.id));
+    for (const secret of sourceSecrets) {
+      if (!secret.chunk_id || !persistedChunkIds.has(secret.chunk_id)) {
+        secret.chunk_id = "";
+      }
+      quarantinedSecrets.push(secret);
+      await repository.createSecret(secret);
+    }
+
+    for (const auditPayload of pendingInjectionAudits) {
+      await logInjectionAudit(auditPayload);
     }
 
     // Build ACL Scope Map entry
