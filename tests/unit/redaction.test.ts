@@ -115,6 +115,21 @@ describe("Secret & PII Redaction Engine (docs/SECURITY.md & Trap 4)", () => {
     expect(result.quarantinedSecrets).toHaveLength(0);
   });
 
+  it("detects and redacts fine-grained GitHub PATs (github_pat_...)", () => {
+    const token = ["github_pat", "11ABCDEFG0123456789", "xyzABCDEF1234567890"].join("_");
+    const raw = `GitHub backup config token=${token}`;
+    const result = redactSecretsAndPII(raw, "SRC-GH-TEST");
+
+    expect(result.redactedText).not.toContain(token);
+    expect(result.redactedText).toContain(
+      "[REDACTED_SECRET: API_KEY — Administered by Project Lead]"
+    );
+    expect(result.redactionCount).toBe(1);
+    expect(result.quarantinedSecrets[0].secret_type).toBe("api_key");
+    expect(result.quarantinedSecrets[0].masked_preview).toBe("github_pat_••••7890");
+    expect(maskSecretPreview(token, "api_key")).toBe("github_pat_••••7890");
+  });
+
   it("masks previews without exposing sensitive content", () => {
     expect(maskSecretPreview("sk_live_1234567890abcdef", "api_key")).toBe(
       "sk_live_••••cdef"
