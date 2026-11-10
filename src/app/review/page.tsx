@@ -389,7 +389,7 @@ export default function ReviewPage() {
   return (
     <main className="w-full space-y-5">
       <StepGuideBanner stepLabel="STEP 3 OF 4 • REVIEW & APPROVE">
-        Click any <strong>View Source Proof</strong> button to inspect the exact quote, resolve the Purple date conflict, and click <strong>Approve &amp; Publish Handover →</strong>
+        Click any <strong>View Proof</strong> button to inspect the exact quote from project files, resolve the Purple date conflict, and click <strong>Approve &amp; Publish Handover →</strong>
       </StepGuideBanner>
 
       {/* ==================================================================== */}

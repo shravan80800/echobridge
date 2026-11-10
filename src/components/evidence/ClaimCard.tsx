@@ -40,14 +40,14 @@ function formatShortProofLabel(evidence: EvidenceRecord[]): string {
   const rawTitle = evidence[0]?.source_title || evidence[0]?.source_id || "Source";
   const matched = SHORT_SOURCE_LABELS.find(([re]) => re.test(rawTitle));
   if (matched) {
-    return `View Proof · ${matched[1]}`;
+    return `View Proof: ${matched[1]}`;
   }
   const cleaned = rawTitle
     .replace(/\.[a-z0-9]+$/i, "")
     .replace(/[_-]+/g, " ")
     .trim();
   const short = cleaned.length > 20 ? `${cleaned.slice(0, 18).trimEnd()}…` : cleaned;
-  return `View Proof · ${short || "Source"}`;
+  return `View Proof: ${short || "Source"}`;
 }
 
 const rowSurfaceColors: Record<EvidenceState, string> = {
@@ -173,7 +173,7 @@ export function ClaimCard({
                 onClick={() =>
                   onInspectEvidence?.(primaryEvidence, primaryChunk, claim.text)
                 }
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 hover:bg-teal-600 text-teal-800 hover:text-white border border-teal-300 hover:border-teal-600 shadow-sm hover:shadow transition-all cursor-pointer group"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 hover:bg-teal-600 text-teal-800 hover:text-white border border-teal-300 hover:border-teal-600 shadow-sm hover:shadow transition-all cursor-pointer group shrink-0"
                 title="View verbatim source proof"
               >
                 <FileText className="w-3.5 h-3.5 shrink-0" />
