@@ -2,55 +2,40 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  HelpCircle,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  RotateCcw,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  FileCheck2,
-  Shield,
-  Layers,
-} from "lucide-react";
+import { CheckCircle2, RotateCcw } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
 import { Button } from "@/components/ui/Button";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { GapQuestionCard } from "@/components/interview/GapQuestionCard";
-import { SuddenExitFallbackBanner } from "@/components/interview/SuddenExitFallbackBanner";
-import type { GapQuestion, DraftVersion } from "@/types/echobridge.types";
+import type { GapQuestion } from "@/types/echobridge.types";
 
 export default function GapInterviewPage() {
   const { currentRole } = useRole();
   const [questions, setQuestions] = useState<GapQuestion[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState<string>("");
-  const [draftV1_1, setDraftV1_1] = useState<DraftVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [suddenExitNote, setSuddenExitNote] = useState<string | null>(null);
 
-  const departingName = "Aarav Sharma (Departing Lead)";
+  const departingName = "Aarav Sharma";
 
-  // Fetch interview data from /api/gap-interview
   const fetchInterviewData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/gap-interview?projectId=CampusConnect&role=incoming_lead");
+      const res = await fetch(
+        "/api/gap-interview?projectId=CampusConnect&role=incoming_lead"
+      );
       const json = await res.json();
       if (json.success) {
-        setQuestions(json.questions || []);
-        if (json.draftVersionV1_1) {
-          setDraftV1_1(json.draftVersionV1_1);
-        }
-        if (!activeQuestionId && json.questions && json.questions.length > 0) {
-          const firstPending = json.questions.find(
-            (q: GapQuestion) => q.status === "pending"
+        const fetchedQuestions: GapQuestion[] = json.questions || [];
+        setQuestions(fetchedQuestions);
+        if (!activeQuestionId && fetchedQuestions.length > 0) {
+          const firstPending = fetchedQuestions.find(
+            (q) => q.status === "pending"
           );
-          setActiveQuestionId(firstPending ? firstPending.id : json.questions[0].id);
+          setActiveQuestionId(
+            firstPending ? firstPending.id : fetchedQuestions[0].id
+          );
         }
       }
     } catch (err) {
@@ -64,11 +49,13 @@ export default function GapInterviewPage() {
     fetchInterviewData();
   }, [fetchInterviewData]);
 
-  // Submit answer
-  const handleSubmitAnswer = async (questionId: string, answerText: string) => {
+  const handleSubmitAnswer = async (
+    questionId: string,
+    answerText: string
+  ) => {
     try {
       setIsSubmitting(true);
-      setFeedbackMessage(null);
+      setSuddenExitNote(null);
 
       const res = await fetch("/api/gap-interview", {
         method: "POST",
@@ -86,23 +73,9 @@ export default function GapInterviewPage() {
       const json = await res.json();
       if (json.success && json.data) {
         const updatedQuestion: GapQuestion = json.data.question;
-        setDraftV1_1(json.data.draftVersionV1_1);
-
         setQuestions((prev) =>
           prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
         );
-
-        setFeedbackMessage(
-          `Answer recorded! Knowledge gap transitioned to Attested (Blue). New Draft v1.1 Confidence: ${json.data.draftVersionV1_1.confidence.total_score}%.`
-        );
-
-        // Advance to next pending question if available
-        const remainingPending = questions.filter(
-          (q) => q.id !== questionId && q.status === "pending"
-        );
-        if (remainingPending.length > 0) {
-          setActiveQuestionId(remainingPending[0].id);
-        }
       }
     } catch (err) {
       console.error("Failed to submit gap answer:", err);
@@ -111,8 +84,7 @@ export default function GapInterviewPage() {
     }
   };
 
-  // Simulate Sudden Exit
-  const handleSimulateSuddenExit = async (fallbackContact: string) => {
+  const handleSkipRemaining = async () => {
     try {
       setIsSubmitting(true);
       const res = await fetch("/api/gap-interview", {
@@ -121,7 +93,7 @@ export default function GapInterviewPage() {
         body: JSON.stringify({
           action: "sudden_exit",
           projectId: "CampusConnect",
-          assignedFallbackContact: fallbackContact,
+          assignedFallbackContact: "Prof. Deshmukh (Faculty Mentor, CS Dept)",
           audienceRole: "incoming_lead",
         }),
       });
@@ -129,22 +101,21 @@ export default function GapInterviewPage() {
       const json = await res.json();
       if (json.success && json.data) {
         setQuestions(json.data.questions || []);
-        setDraftV1_1(json.data.draftVersionV1_1);
-        setFeedbackMessage(
-          `Sudden exit simulated. Unanswered gaps retained as Red and safely routed to ${fallbackContact}.`
+        setSuddenExitNote(
+          "Unanswered questions will stay marked as open gaps for Prof. Deshmukh"
         );
       }
     } catch (err) {
-      console.error("Failed to simulate sudden exit:", err);
+      console.error("Failed to mark questions as open gaps:", err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Reset Interview state
   const handleReset = async () => {
     try {
       setIsSubmitting(true);
+      setSuddenExitNote(null);
       const res = await fetch("/api/gap-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,10 +127,9 @@ export default function GapInterviewPage() {
       const json = await res.json();
       if (json.success) {
         setQuestions(json.questions || []);
-        if (json.questions.length > 0) {
+        if (json.questions?.length > 0) {
           setActiveQuestionId(json.questions[0].id);
         }
-        setFeedbackMessage("Gap-Interview reset to benchmark state.");
         await fetchInterviewData();
       }
     } catch (err) {
@@ -169,195 +139,132 @@ export default function GapInterviewPage() {
     }
   };
 
-  const totalCount = questions.length;
-  const answeredCount = questions.filter((q) => q.status === "answered").length;
-  const isSuddenExitActive = questions.some((q) => q.status === "skipped_sudden_exit");
+  const isSuddenExitActive = questions.some(
+    (q) => q.status === "skipped_sudden_exit"
+  );
 
   const activeQuestion =
     questions.find((q) => q.id === activeQuestionId) || questions[0];
   const activeIndex = questions.findIndex((q) => q.id === activeQuestion?.id);
 
-  const handlePrevQuestion = () => {
-    if (activeIndex > 0) {
-      setActiveQuestionId(questions[activeIndex - 1].id);
-    }
-  };
-
-  const handleNextQuestion = () => {
-    if (activeIndex < questions.length - 1) {
-      setActiveQuestionId(questions[activeIndex + 1].id);
-    }
-  };
-
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-7xl mx-auto">
+      <main className="max-w-2xl mx-auto w-full py-4">
         <LoadingSkeleton
-          cardCount={2}
-          message="Loading Targeted Gap-Interview Workspace..."
+          cardCount={1}
+          message="Loading missing project questions..."
         />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-5xl mx-auto space-y-6">
+    <main className="max-w-2xl mx-auto w-full space-y-5">
       {/* ==================================================================== */}
-      {/* 1. CLEAN PAGE HEADER                                                 */}
+      {/* 1. CLEAN HEADER                                                      */}
       {/* ==================================================================== */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-accent-primary/15 border border-accent-primary/30 text-accent-cyan uppercase">
-              Stage 4 of 6: Tacit Knowledge Recovery
-            </span>
-            <span className="text-xs font-mono text-text-muted">
-              ADR-006 Epistemic Honesty
-            </span>
-          </div>
-
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary">
-            4. Targeted Gap-Interview
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            2. Targeted Gap Interview
           </h1>
-
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-            Extract unwritten architectural decisions and institutional context before the lead departs. Answers transition Red gaps to{" "}
-            <span className="text-cyan-400 font-semibold font-mono">Attested (Blue)</span> evidence.
+          <p className="text-sm text-slate-600 mt-1">
+            Help fill in unwritten project decisions that aren&apos;t in your files.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleReset}
-            disabled={isSubmitting}
-            className="text-xs font-mono"
-            title="Reset questions to benchmark state"
-          >
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-            Reset
-          </Button>
-
-          <Link href="/review">
-            <Button variant="primary" size="sm" className="text-xs font-mono">
-              Continue to Review (Stage 5) →
-            </Button>
-          </Link>
-        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleReset}
+          disabled={isSubmitting}
+          leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+          className="self-start sm:self-center shrink-0"
+        >
+          Reset Demo
+        </Button>
       </div>
 
-      {/* Success / Feedback Banner */}
-      {feedbackMessage && (
-        <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs flex items-center justify-between font-mono animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span>{feedbackMessage}</span>
-          </div>
-          <button
-            onClick={() => setFeedbackMessage(null)}
-            className="text-cyan-400/70 hover:text-cyan-400"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* ==================================================================== */}
-      {/* 2. COMPACT QUESTION SWITCHER PILLS (FIGURE 2 WORKFLOW)               */}
+      {/* 2. QUESTION SELECTOR TABS (ABOVE CARD)                               */}
       {/* ==================================================================== */}
-      <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-surface border border-border-subtle text-xs font-mono">
-        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-          <span className="text-text-muted text-[11px] px-2 uppercase font-bold tracking-wider hidden sm:inline">
-            Questions:
-          </span>
+      <div className="flex flex-wrap items-center gap-2">
+        {questions.map((q, idx) => {
+          const isCurrent = q.id === activeQuestion?.id;
+          const isDone = q.status === "answered";
 
-          {questions.map((q, idx) => {
-            const isCurrent = q.id === activeQuestion?.id;
-            const isDone = q.status === "answered";
-            const isTrap2 = q.planted_trap_id === 2 || q.id.includes("TRAP-2");
-            const isTrap7 = q.planted_trap_id === 7 || q.id.includes("TRAP-7");
-
-            const shortLabel = isTrap2
-              ? `Q1: Redis Choice (Trap 2)`
-              : isTrap7
-              ? `Q2: Domain Ownership (Trap 7)`
-              : `Q${idx + 1}: Staging Sync`;
-
-            return (
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => setActiveQuestionId(q.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs select-none shrink-0 ${
-                  isCurrent
-                    ? "bg-accent-primary text-white font-bold shadow-sm"
-                    : isDone
-                    ? "bg-canvas text-cyan-400 border border-cyan-500/30 hover:bg-surface-hover"
-                    : "bg-canvas text-text-secondary border border-border-subtle hover:text-text-primary hover:bg-surface-hover"
-                }`}
-              >
+          return (
+            <button
+              key={q.id}
+              type="button"
+              onClick={() => setActiveQuestionId(q.id)}
+              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer inline-flex items-center gap-1.5 border ${
+                isCurrent
+                  ? "bg-teal-700 text-white border-teal-700 shadow-sm font-semibold"
+                  : isDone
+                  ? "bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50 shadow-sm"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100 shadow-sm"
+              }`}
+            >
+              <span>Question {idx + 1}</span>
+              {isDone && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isDone ? "bg-cyan-400" : "bg-rose-400"
-                  }`}
-                />
-                <span>{shortLabel}</span>
-                {isDone && <span className="text-[10px] opacity-80">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Previous / Next Controls */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={handlePrevQuestion}
-            disabled={activeIndex <= 0}
-            className="p-1.5 rounded-lg bg-canvas hover:bg-surface-hover border border-border-subtle text-text-muted hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Previous Question"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleNextQuestion}
-            disabled={activeIndex >= questions.length - 1}
-            className="p-1.5 rounded-lg bg-canvas hover:bg-surface-hover border border-border-subtle text-text-muted hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Next Question"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+                  className={isCurrent ? "text-emerald-200" : "text-emerald-600"}
+                >
+                  ✓
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ==================================================================== */}
-      {/* 3. CENTERED HIGH-FOCUS CARD (CONCEPT MOCKUP FIGURE 2)                */}
+      {/* 3. MAIN CARD (MATCHES FIGURE 2 CONCEPT MOCKUP)                       */}
       {/* ==================================================================== */}
       {activeQuestion && (
         <GapQuestionCard
           question={activeQuestion}
           currentIndex={activeIndex}
-          totalCount={totalCount}
+          totalCount={questions.length}
           departingMemberName={departingName}
           isDepartingLead={currentRole === "departing_member"}
+          cleanMode
           onSubmitAnswer={handleSubmitAnswer}
           isLoading={isSubmitting}
         />
       )}
 
+      {/* Simple Confirmation Note when Sudden Exit / Skip Triggered */}
+      {(suddenExitNote || isSuddenExitActive) && (
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex items-center gap-2.5">
+          <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
+          <span>
+            Unanswered questions will stay marked as open gaps for Prof. Deshmukh
+          </span>
+        </div>
+      )}
+
       {/* ==================================================================== */}
-      {/* 4. SUDDEN EXIT FALLBACK BAR (CLEAN FOOTER BOX BELOW CARD)            */}
+      {/* 4. BOTTOM NAVIGATION BAR BELOW THE CARD                              */}
       {/* ==================================================================== */}
-      <SuddenExitFallbackBanner
-        isSuddenExitActive={isSuddenExitActive}
-        assignedFallbackContact="Prof. Deshmukh (Faculty Mentor, CS Dept)"
-        unansweredCount={questions.filter((q) => q.status === "pending").length}
-        onSimulateSuddenExit={handleSimulateSuddenExit}
-        onReset={handleReset}
-        isLoading={isSubmitting}
-      />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleSkipRemaining}
+          disabled={isSubmitting}
+          className="w-full sm:w-auto"
+        >
+          Departing member unavailable? Skip remaining questions
+        </Button>
+
+        <Link href="/review" className="w-full sm:w-auto">
+          <Button variant="primary" className="w-full sm:w-auto">
+            Continue to Review &amp; Approval →
+          </Button>
+        </Link>
+      </div>
     </main>
   );
 }

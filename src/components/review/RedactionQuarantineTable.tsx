@@ -1,12 +1,3 @@
-"use strict";
-/**
- * Redaction & Quarantine Table
- * Implements docs/SECURITY.md Section 2 & 3, docs/DESIGN.md Section 5.5, and TASKS.md TASK-011.
- *
- * Displays masked credentials, personal PII, and flagged prompt injection attempts
- * in a secure quarantine vault with zero raw secret leakage to the client.
- */
-
 "use client";
 
 import React, { useState } from "react";
@@ -22,8 +13,7 @@ import {
   Lock,
   ShieldAlert,
   CheckCircle2,
-  AlertTriangle,
-  Clock,
+  ShieldCheck,
 } from "lucide-react";
 
 interface RedactionQuarantineTableProps {
@@ -35,9 +25,19 @@ interface RedactionQuarantineTableProps {
   className?: string;
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  "SRC-CHAT-03": "Team Chat Export (March)",
+  "SRC-BACKLOG-07": "Feature Backlog Notes",
+  "SRC-ARCH-01": "Architecture Doc v2",
+  "SRC-GIT-02": "GitHub PR #12 Export",
+  "SRC-PLAN-04": "Event Planning Doc",
+  "SRC-RUNBOOK-05": "Deployment Runbook",
+  "SRC-FIN-06": "Finance & Sponsorship Folder",
+  "SRC-TASK-08": "Sprint Task Board",
+};
+
 export function RedactionQuarantineTable({
   secrets,
-  onStatusChange,
   className = "",
 }: RedactionQuarantineTableProps) {
   const [filterType, setFilterType] = useState<string>("all");
@@ -57,234 +57,170 @@ export function RedactionQuarantineTable({
     switch (type) {
       case "api_key":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Key className="w-3 h-3" /> API KEY
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 cursor-default select-none">
+            <Key className="w-3 h-3 shrink-0" />
+            <span>API Key</span>
           </span>
         );
       case "password":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-            <Lock className="w-3 h-3" /> PASSWORD
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 cursor-default select-none">
+            <Lock className="w-3 h-3 shrink-0" />
+            <span>Password</span>
           </span>
         );
       case "phone":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
-            <Phone className="w-3 h-3" /> PHONE PII
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-800 border border-purple-200 cursor-default select-none">
+            <Phone className="w-3 h-3 shrink-0" />
+            <span>Phone Number</span>
           </span>
         );
       case "email":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Mail className="w-3 h-3" /> EMAIL PII
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200 cursor-default select-none">
+            <Mail className="w-3 h-3 shrink-0" />
+            <span>Email Address</span>
           </span>
         );
       case "prompt_injection":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            <ShieldAlert className="w-3 h-3" /> PROMPT INJECTION
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 cursor-default select-none">
+            <ShieldAlert className="w-3 h-3 shrink-0" />
+            <span>Unsafe Instruction</span>
           </span>
         );
     }
   };
 
-  const isPlantedTrap = (secret: QuarantinedSecret) => {
-    if (
-      secret.source_id === "SRC-CHAT-03" &&
-      (secret.secret_type === "api_key" || secret.secret_type === "phone")
-    ) {
-      return "Trap 4: Secret/PII Redaction";
-    }
-    if (
-      secret.source_id === "SRC-BACKLOG-07" ||
-      secret.secret_type === "prompt_injection"
-    ) {
-      return "Trap 6: Injection Stripped";
-    }
-    return null;
-  };
-
   return (
     <div
-      className={`rounded-xl border border-subtle bg-surface p-5 shadow-lg ${className}`}
+      className={`rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-subtle">
-        <div>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-base font-semibold text-text-primary">
-              Quarantine Vault & Security Alerts
+      {/* Header & Filter Controls */}
+      <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ShieldAlert className="w-5 h-5 text-teal-700 shrink-0" />
+            <h3 className="text-base font-semibold text-slate-900">
+              Hidden &amp; Quarantined Items
             </h3>
-            <span className="px-2 py-0.5 text-xs font-mono rounded-full bg-surface-hover text-text-secondary border border-subtle">
-              {secrets.length} items
+            <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200 cursor-default select-none">
+              {secrets.length} items protected
             </span>
           </div>
-          <p className="text-xs text-text-muted mt-1">
-            Raw secrets and injection instructions are strictly isolated at
-            ingestion. Zero credentials enter chunk embeddings or model prompts.
+          <p className="text-xs sm:text-sm text-slate-600">
+            Sensitive keys, phone numbers, and unsafe instructions are hidden before any handover draft is created.
           </p>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 bg-canvas p-1 rounded-lg border border-subtle text-xs">
+        {/* Clean Filter Switcher */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs overflow-x-auto scrollbar-none shrink-0">
           <button
+            type="button"
             onClick={() => setFilterType("all")}
-            className={`px-2.5 py-1 rounded font-medium transition-colors ${
+            className={`px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
               filterType === "all"
-                ? "bg-surface text-text-primary border border-subtle shadow-sm"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-white text-slate-900 border border-slate-200 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             All ({secrets.length})
           </button>
           <button
+            type="button"
             onClick={() => setFilterType("credentials")}
-            className={`px-2.5 py-1 rounded font-medium transition-colors ${
+            className={`px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
               filterType === "credentials"
-                ? "bg-surface text-amber-400 border border-subtle shadow-sm"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-white text-slate-900 border border-slate-200 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Keys & Creds
+            Keys
           </button>
           <button
+            type="button"
             onClick={() => setFilterType("pii")}
-            className={`px-2.5 py-1 rounded font-medium transition-colors ${
+            className={`px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
               filterType === "pii"
-                ? "bg-surface text-purple-400 border border-subtle shadow-sm"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-white text-slate-900 border border-slate-200 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            PII
+            Personal Info
           </button>
           <button
+            type="button"
             onClick={() => setFilterType("injections")}
-            className={`px-2.5 py-1 rounded font-medium transition-colors ${
+            className={`px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
               filterType === "injections"
-                ? "bg-surface text-rose-400 border border-subtle shadow-sm"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-white text-slate-900 border border-slate-200 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Injections
+            Unsafe Text
           </button>
         </div>
       </div>
 
+      {/* Items List (Responsive, Zero Horizontal Scroll on Mobile) */}
       {filteredSecrets.length === 0 ? (
-        <div className="py-10 text-center">
-          <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-75" />
-          <p className="text-sm text-text-secondary font-medium">
-            No quarantined items found
+        <div className="py-10 px-4 text-center">
+          <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+          <p className="text-sm text-slate-800 font-medium">
+            No hidden items in this filter
           </p>
-          <p className="text-xs text-text-muted mt-0.5">
-            {filterType === "all"
-              ? "All source texts have been parsed cleanly without active credential violations."
-              : `No items matching the '${filterType}' filter.`}
+          <p className="text-xs text-slate-500 mt-1">
+            All project files were scanned cleanly.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto mt-4">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-subtle text-text-muted font-mono uppercase text-[10px] tracking-wider">
-                <th className="py-2.5 px-3">Type</th>
-                <th className="py-2.5 px-3">Source & Chunk</th>
-                <th className="py-2.5 px-3">Masked Preview (Zero Leak)</th>
-                <th className="py-2.5 px-3">Protection Action</th>
-                <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3 text-right">Detected</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-subtle/50 font-sans">
-              {filteredSecrets.map((secret) => {
-                const trapLabel = isPlantedTrap(secret);
-                return (
-                  <tr
-                    key={secret.id}
-                    className="hover:bg-surface-hover/50 transition-colors"
+        <div className="divide-y divide-slate-200">
+          {filteredSecrets.map((secret) => {
+            const isInjection = secret.secret_type === "prompt_injection";
+            const sourceName =
+              SOURCE_LABELS[secret.source_id] || secret.source_id;
+
+            return (
+              <div
+                key={secret.id}
+                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {getSecretTypeBadge(secret.secret_type)}
+                    <span className="text-xs text-slate-600 font-medium">
+                      Found in <span className="text-slate-900">{sourceName}</span>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-slate-500">Masked preview:</span>
+                    <code className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-xs break-all">
+                      {secret.masked_preview}
+                    </code>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-default select-none ${
+                      isInjection
+                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                        : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                    }`}
                   >
-                    <td className="py-3 px-3 align-middle">
-                      <div className="flex flex-col gap-1 items-start">
-                        {getSecretTypeBadge(secret.secret_type)}
-                        {trapLabel && (
-                          <span className="inline-block text-[10px] font-mono text-indigo-400 font-semibold">
-                            🎯 {trapLabel}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 align-middle">
-                      <div className="font-mono text-text-secondary">
-                        <span className="text-indigo-400">{secret.source_id}</span>
-                        {secret.chunk_id && (
-                          <span className="text-text-muted block text-[11px]">
-                            {secret.chunk_id}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 align-middle font-mono">
-                      <div className="bg-canvas/80 px-2.5 py-1 rounded border border-subtle text-text-primary text-xs inline-block max-w-xs sm:max-w-md truncate">
-                        {secret.masked_preview}
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-3 align-middle text-text-secondary">
-                      {secret.secret_type === "prompt_injection" ? (
-                        <span className="text-rose-400 flex items-center gap-1 text-xs">
-                          <ShieldAlert className="w-3.5 h-3.5" /> Stripped from
-                          prompt
-                        </span>
-                      ) : (
-                        <span className="text-emerald-400 flex items-center gap-1 text-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Masked in chunk
-                          pointer
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-3 px-3 align-middle">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
-                          secret.reviewer_status === "quarantined"
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : secret.reviewer_status === "purged"
-                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}
-                      >
-                        {secret.reviewer_status.toUpperCase()}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-3 align-middle text-right text-text-muted font-mono text-[11px]">
-                      {new Date(secret.detected_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {isInjection ? "Removed safely" : "Masked & quarantined"}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
-
-      <div className="mt-4 pt-3 border-t border-subtle/70 flex flex-col sm:flex-row items-center justify-between text-xs text-text-muted gap-2">
-        <div className="flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-indigo-400" />
-          <span>
-            Immutable security log recorded in Supabase <code>audit_events</code>.
-          </span>
-        </div>
-        <div className="text-[11px] font-mono text-text-muted">
-          EchoBridge Quarantine Engine v1.0
-        </div>
-      </div>
     </div>
   );
 }

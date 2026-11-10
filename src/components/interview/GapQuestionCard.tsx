@@ -2,21 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  HelpCircle,
-  AlertTriangle,
-  UserCheck,
-  Clock,
   Sparkles,
-  Send,
   Edit3,
-  ShieldAlert,
   CheckCircle2,
-  Lock,
-  ArrowRight,
   UserX,
+  AlertTriangle,
 } from "lucide-react";
 import type { GapQuestion } from "@/types/echobridge.types";
-import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
 import { Button } from "@/components/ui/Button";
 
 interface GapQuestionCardProps {
@@ -25,18 +17,18 @@ interface GapQuestionCardProps {
   totalCount: number;
   departingMemberName?: string;
   isDepartingLead?: boolean;
+  cleanMode?: boolean;
   onSubmitAnswer: (questionId: string, answerText: string) => Promise<void>;
   isLoading?: boolean;
 }
 
-// Sample answers pre-configured for judges to test 1-click answers for planted traps
 const SAMPLE_ANSWERS: Record<string, string> = {
   "GAP-TRAP-2":
     "Redis was selected specifically because during the 2025 spring hackathon surge, PostgreSQL connection pool limits were exhausted under 1,200 concurrent users, causing HTTP 504 gateway timeouts. Moving active session state into Redis eliminated the database pool bottleneck.",
   "GAP-TRAP-7":
     "The campusconnect.dev domain renewal is managed directly by Prof. Deshmukh through the CS Department university registrar account. Billing is renewed annually on August 15th via university budget line #CS-2025.",
   "GAP-003":
-    "Vercel Preview staging environments are triggered automatically on every pull request targeting the 'develop' branch. Environment variables are synced from the .env.staging Vault secret group.",
+    "Vercel Preview staging environments are triggered automatically on every pull request targeting the 'develop' branch. Environment variables are synced from the staging environment secret group.",
 };
 
 export function GapQuestionCard({
@@ -44,7 +36,7 @@ export function GapQuestionCard({
   currentIndex,
   totalCount,
   departingMemberName = "Aarav Sharma",
-  isDepartingLead = true,
+  cleanMode = false,
   onSubmitAnswer,
   isLoading = false,
 }: GapQuestionCardProps) {
@@ -76,186 +68,233 @@ export function GapQuestionCard({
   const isAnswered = question.status === "answered" && !!question.answer_text;
   const isSkippedSuddenExit = question.status === "skipped_sudden_exit";
 
-  const getPlantedTrapLabel = () => {
-    if (question.planted_trap_id === 2 || question.id.includes("TRAP-2")) {
-      return "Trap 2: Redis Choice Rationale";
+  const isRedisGap =
+    question.planted_trap_id === 2 || question.id.includes("TRAP-2");
+  const isDomainGap =
+    question.planted_trap_id === 7 || question.id.includes("TRAP-7");
+
+  const getGapHeadline = () => {
+    if (isRedisGap) {
+      return "Gap found: rationale for choosing Redis is not in any source";
     }
-    if (question.planted_trap_id === 7 || question.id.includes("TRAP-7")) {
-      return "Trap 7: Domain Registrar Ownership";
+    if (isDomainGap) {
+      return "Gap found: domain renewal ownership is not documented in any source";
     }
+    return "Gap found: staging deployment details are not in any source";
+  };
+
+  const getTestTrapLabel = () => {
+    if (isRedisGap) return "Trap 2: Redis Choice Rationale";
+    if (isDomainGap) return "Trap 7: Domain Registrar Ownership";
     return null;
   };
 
-  const trapLabel = getPlantedTrapLabel();
+  const testTrapLabel = getTestTrapLabel();
 
   return (
-    <div
-      className={`rounded-2xl border transition-all shadow-xl ${
-        isAnswered
-          ? "border-cyan-500/40 bg-surface shadow-cyan-950/20"
-          : isSkippedSuddenExit
-          ? "border-rose-500/30 bg-surface shadow-rose-950/20"
-          : "border-border-subtle bg-surface"
-      }`}
-    >
-      {/* Top Bar of Figure 2 Concept Mockup */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-border-subtle bg-canvas/40">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-mono font-bold tracking-tight text-text-primary">
+    <div className="w-full rounded-xl overflow-hidden shadow-sm">
+      {/* ==================================================================== */}
+      {/* CARD TOP HEADER BAR (Matches Figure 2 Dark Teal Header)              */}
+      {/* ==================================================================== */}
+      <div className="bg-teal-900 text-white px-5 py-3.5 rounded-t-xl flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className="font-bold tracking-tight text-sm text-white">
             EchoBridge
           </span>
-          <span className="text-text-muted text-xs">•</span>
-          <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-accent-primary/10 text-accent-cyan border border-accent-primary/20">
+          <span className="bg-teal-800 text-teal-100 border border-teal-700 rounded-full px-2.5 py-0.5 text-xs font-medium cursor-default select-none">
             Gap-Interview
           </span>
 
-          {trapLabel && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-              🎯 {trapLabel}
+          {!cleanMode && testTrapLabel && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-900 cursor-default select-none">
+              {testTrapLabel}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {isAnswered ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>ATTESTED</span>
-            </span>
-          ) : isSkippedSuddenExit ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <UserX className="w-3.5 h-3.5" />
-              <span>UNSUPPORTED GAP</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>UNSUPPORTED GAP</span>
+          {!cleanMode && (
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium cursor-default select-none ${
+                isAnswered
+                  ? "bg-blue-100 text-blue-900"
+                  : "bg-rose-100 text-rose-900"
+              }`}
+            >
+              {isAnswered ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ATTESTED</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>UNSUPPORTED GAP</span>
+                </>
+              )}
             </span>
           )}
 
-          <span className="text-xs font-mono font-bold text-text-muted px-2 py-0.5 rounded bg-canvas border border-border-subtle">
+          <span className="text-xs font-medium text-teal-100">
             Question {currentIndex + 1} of {totalCount}
           </span>
         </div>
       </div>
 
-      <div className="p-6 md:p-8 space-y-6">
-        {/* Red Gap Banner inside card matching Figure 2 */}
-        <div className="border-l-4 border-rose-500 bg-rose-500/10 p-4 rounded-r-xl space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-rose-400 uppercase tracking-wide">
-              {trapLabel ? `Gap found: rationale for choosing Redis is not in any source` : "Knowledge Gap Detected"}
-            </span>
+      {/* ==================================================================== */}
+      {/* CARD BODY                                                            */}
+      {/* ==================================================================== */}
+      <div className="bg-white p-5 sm:p-6 rounded-b-xl border border-t-0 border-slate-200 space-y-5">
+        {/* 1. Red Gap Callout Box (Matches Figure 2) */}
+        <div className="bg-rose-50/70 border border-rose-200 border-l-4 border-l-rose-500 rounded-lg p-4 space-y-1">
+          <div className="text-slate-900 font-semibold text-base leading-snug">
+            {getGapHeadline()}
           </div>
           {question.context_summary && (
-            <p className="text-xs text-rose-200/90 leading-relaxed font-sans">
+            <p className="text-sm text-slate-600 leading-relaxed font-normal">
               {question.context_summary}
             </p>
           )}
         </div>
 
-        {/* Bold Question Heading */}
+        {/* 2. Question Prompt */}
         <div>
-          <h2 className="text-lg md:text-2xl font-bold tracking-tight text-text-primary leading-snug">
+          <label
+            htmlFor={`gap-answer-${question.id}`}
+            className="block text-slate-800 font-medium text-base leading-snug"
+          >
             {question.question_text}
-          </h2>
-          <span className="text-[11px] font-mono text-text-muted mt-1 block">
-            Targeted unwritten institutional context • Claim ID: {question.claim_id}
-          </span>
+          </label>
         </div>
 
-        {/* State A: Answered Mode */}
+        {/* State A: Answered View */}
         {isAnswered && !isEditing ? (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-canvas border border-cyan-500/30 space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono text-cyan-300">
-                <span className="flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400" />
-                  Attested by Aarav Sharma ({question.answered_at ? new Date(question.answered_at).toLocaleDateString() : "Just now"})
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-slate-600 font-medium">
+                  {cleanMode
+                    ? `Answered by ${departingMemberName}`
+                    : `Attested by ${departingMemberName} (${
+                        question.answered_at
+                          ? new Date(question.answered_at).toLocaleDateString()
+                          : "Just now"
+                      })`}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setIsEditing(true)}
-                  className="text-[11px] font-mono text-text-muted hover:text-cyan-300 flex items-center gap-1"
+                  leftIcon={<Edit3 className="w-3.5 h-3.5" />}
                 >
-                  <Edit3 className="w-3 h-3" />
-                  <span>Edit</span>
-                </button>
+                  Edit answer
+                </Button>
               </div>
 
-              <p className="text-sm text-text-primary leading-relaxed font-sans bg-surface/50 p-3 rounded-lg border border-border-subtle">
+              <p className="text-sm text-slate-900 leading-relaxed bg-white p-3.5 rounded-lg border border-slate-200">
                 &ldquo;{question.answer_text}&rdquo;
               </p>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-text-muted pt-1">
-                <span>
-                  ✓ Claim promoted to <strong>Blue Attested</strong> (never counted as Corroborated Green).
-                </span>
-                <span className="text-cyan-400 font-bold">
-                  Draft v1.1 Updated
-                </span>
-              </div>
+              {!cleanMode && (
+                <p className="text-xs text-slate-600">
+                  Claim promoted to <strong>Attested</strong> evidence.
+                </p>
+              )}
+            </div>
+
+            {/* Figure 2 Bottom Confirmation Pill */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full px-3 py-1 text-xs font-medium cursor-default select-none">
+                <span>✓ Saved as Attested evidence</span>
+              </span>
             </div>
           </div>
         ) : isSkippedSuddenExit ? (
-          /* State B: Sudden Exit Mode */
-          <div className="p-5 rounded-xl bg-rose-950/20 border border-rose-500/30 space-y-3">
-            <div className="flex items-center gap-2 text-rose-300 text-xs font-mono font-bold">
-              <UserX className="w-4 h-4 text-rose-400" />
-              <span>Departing Member Unavailable (Sudden Exit)</span>
+          /* State B: Marked Open for Mentor */
+          <div className="p-4 rounded-lg bg-amber-50/70 border border-amber-200 space-y-2.5">
+            <div className="flex items-center gap-2 text-amber-900 text-sm font-semibold">
+              <UserX className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>
+                {cleanMode
+                  ? "Marked as an open question for Prof. Deshmukh"
+                  : "Departing Member Unavailable (Sudden Exit)"}
+              </span>
             </div>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              This gap remains marked as <strong className="text-rose-400 font-mono">UNSUPPORTED GAP</strong>. It was safely retained and assigned to designated faculty mentor:
+            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+              {cleanMode ? (
+                <>
+                  Unanswered questions will stay marked as open gaps for{" "}
+                  <strong>Prof. Deshmukh</strong> to handle during review.
+                </>
+              ) : (
+                <>
+                  Preserved as <strong>UNSUPPORTED GAP</strong> and routed to{" "}
+                  <strong>
+                    {question.assigned_contact_if_unanswered ||
+                      "Prof. Deshmukh (Faculty Mentor, CS Dept)"}
+                  </strong>
+                  .
+                </>
+              )}
             </p>
-            <div className="p-3 rounded-lg bg-canvas border border-rose-500/20 text-xs font-mono text-rose-200">
-              Assigned Contact: <strong>Prof. Deshmukh (Faculty Mentor, CS Dept)</strong>
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                Answer this question now
+              </Button>
             </div>
           </div>
         ) : (
-          /* State C: Input Form (Figure 2 Concept Mockup) */
+          /* State C: Answer Input Form (Matches Figure 2) */
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-mono text-text-secondary">
-                Departing Lead Response:
-              </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-slate-500 font-medium">
+                Your explanation will be added with attribution
+              </span>
 
-              {/* 1-Click Demo Fill Button */}
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={handleFillSample}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono text-accent-cyan hover:text-white bg-accent-cyan/10 hover:bg-accent-cyan/20 border border-accent-cyan/20 transition-colors"
-                title="Pre-fill authentic testimony for this planted gap"
+                leftIcon={<Sparkles className="w-3.5 h-3.5 text-teal-700" />}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>✨ Fill Demo Answer (Aarav)</span>
-              </button>
+                ✨ Fill sample answer for demo
+              </Button>
             </div>
 
             <textarea
+              id={`gap-answer-${question.id}`}
               rows={4}
               value={answerText}
               onChange={(e) => setAnswerText(e.target.value)}
-              placeholder="Type your answer to explain the technical rationale..."
-              className="w-full px-4 py-3 rounded-xl bg-canvas border border-border-subtle text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary placeholder:text-text-muted font-sans leading-relaxed resize-y"
+              placeholder="Write a clear explanation in plain words..."
+              className="w-full min-h-[110px] px-3.5 py-3 rounded-lg bg-white border border-slate-300 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 leading-relaxed resize-y"
               required
             />
 
-            {/* Bottom Row */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <span className="text-[11px] font-mono text-text-muted">
-                Testimony will be verified by Gemini &amp; promoted to <strong>Attested (Blue)</strong>.
-              </span>
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div>
+                {isAnswered && (
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full px-3 py-1 text-xs font-medium cursor-default select-none">
+                    <span>✓ Saved as Attested evidence</span>
+                  </span>
+                )}
+              </div>
 
               <Button
                 type="submit"
                 variant="primary"
-                size="md"
                 isLoading={isLoading}
                 disabled={!answerText.trim() || isLoading}
-                className="text-xs font-mono w-full sm:w-auto"
+                className="w-full sm:w-auto sm:ml-auto"
               >
-                Submit as Attested Evidence
+                {cleanMode ? "Submit" : "Submit as Attested Evidence"}
               </Button>
             </div>
           </form>

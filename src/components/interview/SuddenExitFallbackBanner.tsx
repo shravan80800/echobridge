@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { UserX, ShieldAlert, ArrowRight, RotateCcw, CheckCircle2 } from "lucide-react";
+import { UserX, ShieldAlert, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface SuddenExitFallbackBannerProps {
@@ -22,71 +22,71 @@ export function SuddenExitFallbackBanner({
   onReset,
   isLoading = false,
 }: SuddenExitFallbackBannerProps) {
-  const [customContact, setCustomContact] = useState(assignedFallbackContact);
-  const [showConfig, setShowConfig] = useState(false);
-
-  const fallbackRecipient = "Prof. Deshmukh (Faculty Mentor, CS Dept)";
+  const fallbackRecipient =
+    assignedFallbackContact || "Prof. Deshmukh (Faculty Mentor, CS Dept)";
 
   const handleSimulate = async () => {
     await onSimulateSuddenExit(fallbackRecipient);
-    setShowConfig(false);
   };
 
   return (
     <div
-      className={`rounded-2xl border p-5 transition-all ${
+      className={`rounded-xl border p-5 transition-all shadow-sm ${
         isSuddenExitActive
-          ? "border-rose-500/40 bg-rose-950/20 shadow-lg shadow-rose-950/20"
-          : "border-border-subtle bg-surface"
+          ? "border-rose-200 bg-rose-50/70"
+          : "border-slate-200 bg-white"
       }`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div
-            className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+            className={`p-2.5 rounded-lg shrink-0 mt-0.5 border ${
               isSuddenExitActive
-                ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                : "bg-canvas text-text-secondary border border-border-subtle"
+                ? "bg-rose-100 text-rose-700 border-rose-200"
+                : "bg-slate-100 text-slate-600 border-slate-200"
             }`}
           >
             {isSuddenExitActive ? (
-              <ShieldAlert className="w-5 h-5 text-rose-400" />
+              <ShieldAlert className="w-5 h-5" />
             ) : (
-              <UserX className="w-5 h-5 text-text-secondary" />
+              <UserX className="w-5 h-5" />
             )}
           </div>
 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-text-primary">
+              <h3 className="text-sm font-semibold text-slate-900">
                 Sudden-Exit Safety Fallback • Sudden Exit Safety Handler (ADR-006)
               </h3>
               {isSuddenExitActive ? (
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200 cursor-default select-none">
                   Fallback Mode Active
                 </span>
               ) : (
-                <span className="text-[11px] font-mono text-text-muted">
-                  Departing person unavailable? (Sudden Exit Mode)
+                <span className="text-xs text-slate-500">
+                  Departing person unavailable?
                 </span>
               )}
             </div>
 
-            <p className="text-xs text-text-secondary leading-relaxed max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-2xl">
               {isSuddenExitActive ? (
                 <>
-                  Departing member was unavailable. <strong className="text-rose-300 font-mono">{unansweredCount}</strong> knowledge gap(s) were preserved as <span className="text-rose-400 font-mono font-semibold">RED (UNSUPPORTED)</span> and safely routed to faculty mentor <strong className="text-text-primary font-mono">{fallbackRecipient}</strong>.
+                  Departing member was unavailable.{" "}
+                  <strong className="text-rose-800">{unansweredCount}</strong>{" "}
+                  unanswered question(s) remain marked as open gaps and routed to{" "}
+                  <strong className="text-slate-900">{fallbackRecipient}</strong>.
                 </>
               ) : (
                 <>
-                  If the departing lead is suddenly unavailable, trigger this fallback to preserve open gaps as Red and automatically route them to <strong>{fallbackRecipient}</strong>.
+                  If the departing member is unavailable, keep unanswered questions marked as open gaps for{" "}
+                  <strong className="text-slate-900">{fallbackRecipient}</strong>.
                 </>
               )}
             </p>
           </div>
         </div>
 
-        {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end md:self-center">
           {isSuddenExitActive ? (
             <Button
@@ -94,27 +94,24 @@ export function SuddenExitFallbackBanner({
               size="sm"
               onClick={onReset}
               disabled={isLoading}
-              className="text-xs font-mono"
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
               Reset Mode
             </Button>
           ) : (
             <Button
-              variant="secondary"
+              variant="destructive"
               size="sm"
               onClick={handleSimulate}
               disabled={isLoading}
-              className="text-xs font-mono text-rose-300 hover:text-white hover:bg-rose-500/20 border-rose-500/30"
-              title="Demonstrates how unanswered gaps stay Red and get assigned to Prof. Deshmukh"
             >
               Simulate Sudden Exit
             </Button>
           )}
 
           <Link href="/review">
-            <Button variant="primary" size="sm" className="text-xs font-mono">
-              Continue to Review (Stage 5) →
+            <Button variant="primary" size="sm">
+              Continue to Review &amp; Approval →
             </Button>
           </Link>
         </div>
