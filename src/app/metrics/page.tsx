@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { QualityMetricsGauge } from "@/components/metrics/QualityMetricsGauge";
 import { TrapScorecardTable } from "@/components/metrics/TrapScorecardTable";
+import { useRole } from "@/components/layout/RoleContext";
 import type { SystemMetricsReport } from "@/services/trust/metrics.service";
 
 export default function MetricsPage() {
+  const { activeProjectId, activeProjectName } = useRole();
   const [metrics, setMetrics] = useState<SystemMetricsReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -26,9 +28,12 @@ export default function MetricsPage() {
   const fetchMetrics = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/metrics?projectId=CampusConnect", {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/metrics?projectId=${encodeURIComponent(activeProjectId)}`,
+        {
+          cache: "no-store",
+        }
+      );
       const json = await res.json();
       if (json.success) {
         setMetrics(json);
@@ -39,7 +44,7 @@ export default function MetricsPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     fetchMetrics();
@@ -88,7 +93,7 @@ export default function MetricsPage() {
           </h1>
           <p className="text-sm text-slate-600 mt-1 max-w-2xl">
             Live verification metrics on the{" "}
-            <strong className="text-slate-900">CampusConnect</strong> dataset,
+            <strong className="text-slate-900">{activeProjectName}</strong> workspace,
             covering citation accuracy, gap detection, zero hallucinations, and
             access control.
           </p>

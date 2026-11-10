@@ -56,13 +56,49 @@ export function GapQuestionCard({
   };
 
   const handleFillSample = () => {
-    const sample =
-      SAMPLE_ANSWERS[question.id] ||
-      (question.planted_trap_id === 2 ? SAMPLE_ANSWERS["GAP-TRAP-2"] : "") ||
-      (question.planted_trap_id === 7 ? SAMPLE_ANSWERS["GAP-TRAP-7"] : "") ||
-      SAMPLE_ANSWERS["GAP-003"] ||
-      "Documented based on team discussion: PostgreSQL connection pool exhausted under 1,200 concurrent users during hackathon surge.";
-    setAnswerText(sample);
+    if (SAMPLE_ANSWERS[question.id]) {
+      setAnswerText(SAMPLE_ANSWERS[question.id]);
+      return;
+    }
+    if (question.planted_trap_id === 2) {
+      setAnswerText(SAMPLE_ANSWERS["GAP-TRAP-2"]);
+      return;
+    }
+    if (question.planted_trap_id === 7) {
+      setAnswerText(SAMPLE_ANSWERS["GAP-TRAP-7"]);
+      return;
+    }
+    if (question.id === "GAP-003") {
+      setAnswerText(SAMPLE_ANSWERS["GAP-003"]);
+      return;
+    }
+
+    const lowerQ = question.question_text.toLowerCase();
+    if (
+      lowerQ.includes("issue") ||
+      lowerQ.includes("pull request") ||
+      lowerQ.includes("priority") ||
+      lowerQ.includes("blocker")
+    ) {
+      setAnswerText(
+        "Top week-one priority is triaging open issues and verifying pending pull requests before introducing breaking changes. Current maintainers review PRs before merging to main."
+      );
+      return;
+    }
+    if (
+      lowerQ.includes("secret") ||
+      lowerQ.includes("credential") ||
+      lowerQ.includes("deploy") ||
+      lowerQ.includes("rollback")
+    ) {
+      setAnswerText(
+        "Environment secrets are stored exclusively in Vercel / .env.local (never in Git). Deploys trigger on push to main after typecheck/build checks, and rollbacks use instant deployment promotion."
+      );
+      return;
+    }
+    setAnswerText(
+      "The primary stack was selected for TypeScript type safety, modular API boundaries, and zero-config deployment. Preserve existing schema validations and security guards before refactoring core modules."
+    );
   };
 
   const isAnswered = question.status === "answered" && !!question.answer_text;
@@ -80,7 +116,10 @@ export function GapQuestionCard({
     if (isDomainGap) {
       return "Gap found: domain renewal ownership is not documented in any source";
     }
-    return "Gap found: staging deployment details are not in any source";
+    if (question.id === "GAP-003") {
+      return "Gap found: staging deployment details are not in any source";
+    }
+    return "Gap found: unwritten context & continuity rationale missing from sources";
   };
 
   const getTestTrapLabel = () => {

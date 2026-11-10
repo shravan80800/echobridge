@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck, History } from "lucide-react";
 import { WorkflowStepper } from "./WorkflowStepper";
 import { RoleSwitcherBar } from "./RoleSwitcherBar";
+import { ProjectSwitcherBar } from "./ProjectSwitcherBar";
 import { useRole } from "./RoleContext";
 
 export function Navbar() {
@@ -14,16 +15,20 @@ export function Navbar() {
     <header className="sticky top-0 z-40 w-full bg-white border-b border-slate-200">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Primary Row */}
-        <div className="flex h-16 items-center justify-between gap-3">
-          {/* Left: Clean Brand Title */}
-          <Link href="/" className="flex items-center gap-2 shrink-0 group">
-            <div className="h-8 w-8 rounded-lg bg-teal-700 flex items-center justify-center text-white shadow-sm group-hover:bg-teal-800 transition-colors shrink-0">
-              <ShieldCheck className="w-4.5 h-4.5" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-slate-900">
-              EchoBridge
-            </span>
-          </Link>
+        <div className="flex h-16 items-center justify-between gap-2 sm:gap-3">
+          {/* Left: Brand Title + Workspace Switcher */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
+            <Link href="/" className="flex items-center gap-2 shrink-0 group">
+              <div className="h-8 w-8 rounded-lg bg-teal-700 flex items-center justify-center text-white shadow-sm group-hover:bg-teal-800 transition-colors shrink-0">
+                <ShieldCheck className="w-4.5 h-4.5" />
+              </div>
+              <span className="text-base sm:text-lg font-bold tracking-tight text-slate-900 hidden xs:inline sm:inline">
+                EchoBridge
+              </span>
+            </Link>
+
+            <ProjectSwitcherBar />
+          </div>
 
           {/* Center (Desktop): 4 Plain-English Workflow Steps */}
           <WorkflowStepper />

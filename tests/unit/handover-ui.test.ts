@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReceiptBanner } from "@/components/handover/ReceiptBanner";
@@ -6,9 +6,14 @@ import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
 import { ComprehensionQuizModal } from "@/components/handover/ComprehensionQuizModal";
 import { HandoverCertificateDocument } from "@/components/handover/HandoverCertificateDocument";
 import { ReceiptCertificateModal } from "@/components/handover/ReceiptCertificateModal";
+import { ProjectSwitcherBar } from "@/components/layout/ProjectSwitcherBar";
 import { buildCertificateSvg } from "@/utils/certificate-svg";
 import { getFullVerificationKey } from "@/utils/verification-key";
 import type { Receipt, ClaimRecord, ComprehensionQuestion } from "@/types/echobridge.types";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 describe("Stage 6 UI: Handover Delivery, Onboarding Board & Receipt Modal (TASK-021)", () => {
   const sampleReceipt: Receipt = {
@@ -241,6 +246,51 @@ describe("Stage 6 UI: Handover Delivery, Onboarding Board & Receipt Modal (TASK-
       expect(svg).toContain("Riya &amp; Kabir &lt;Leads&gt;");
       expect(svg).toContain("CampusConnect &amp; Co");
       expect(svg).not.toContain("<Leads>");
+    });
+
+    it("stamps custom imported GitHub repo projectName onto HTML certificate, modal, and SVG export", () => {
+      const repoReceipt: Receipt = {
+        ...sampleReceipt,
+        id: "RCP-LEAD-GH-SHRAVAN80800-ECHOBRIDGE",
+        project_id: "gh-shravan80800-echobridge",
+        draft_version_id: "DFT-GH-SHRAVAN80800-ECHOBRIDGE-LEAD-v2.0",
+      };
+      const fullKey = getFullVerificationKey(repoReceipt);
+
+      const docHtml = renderToStaticMarkup(
+        React.createElement(HandoverCertificateDocument, {
+          receipt: repoReceipt,
+          projectName: "shravan80800/echobridge",
+        })
+      );
+      expect(docHtml).toContain("shravan80800/echobridge");
+      expect(docHtml).toContain("RCP-LEAD-GH-SHRAVAN80800-ECHOBRIDGE");
+      expect(docHtml).toContain(fullKey);
+      expect(docHtml).not.toContain("CampusConnect");
+
+      const modalHtml = renderToStaticMarkup(
+        React.createElement(ReceiptCertificateModal, {
+          isOpen: true,
+          onClose: () => {},
+          receipt: repoReceipt,
+          projectName: "shravan80800/echobridge",
+        })
+      );
+      expect(modalHtml).toContain("shravan80800/echobridge");
+
+      const svg = buildCertificateSvg({
+        receipt: repoReceipt,
+        projectName: "shravan80800/echobridge",
+      });
+      expect(svg).toContain("shravan80800/echobridge");
+      expect(svg).toContain(fullKey);
+      expect(svg).not.toContain("CampusConnect");
+    });
+
+    it("renders ProjectSwitcherBar cleanly using safe default RoleContext fallback", () => {
+      const html = renderToStaticMarkup(React.createElement(ProjectSwitcherBar));
+      expect(html).toContain("CampusConnect");
+      expect(html).toContain("Demo");
     });
   });
 });

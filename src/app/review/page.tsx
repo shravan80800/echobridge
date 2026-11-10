@@ -34,7 +34,13 @@ import type {
 import type { VersionDiffSummary } from "@/services/workflow/review.service";
 
 export default function ReviewPage() {
-  const { currentRole, currentProfile, switchRole } = useRole();
+  const {
+    currentRole,
+    currentProfile,
+    switchRole,
+    activeProjectId,
+    activeProjectName,
+  } = useRole();
   const [audienceRole, setAudienceRole] =
     useState<AudienceRole>("incoming_lead");
   const [viewMode, setViewMode] = useState<"claims" | "diff">("claims");
@@ -74,12 +80,13 @@ export default function ReviewPage() {
   const fetchReviewData = useCallback(async () => {
     try {
       setIsLoading(true);
+      const encodedProject = encodeURIComponent(activeProjectId);
       const [reviewRes, ingestRes] = await Promise.all([
         fetch(
-          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=${fromVersion}&toVersion=${toVersion}`,
+          `/api/review?projectId=${encodedProject}&role=${audienceRole}&fromVersion=${fromVersion}&toVersion=${toVersion}`,
           { cache: "no-store" }
         ),
-        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
+        fetch(`/api/ingest?projectId=${encodedProject}`, { cache: "no-store" }),
       ]);
 
       const [json, ingestJson] = await Promise.all([
@@ -95,14 +102,24 @@ export default function ReviewPage() {
         const matched = (json.drafts as DraftVersion[]).find(
           (d) => d.version_label === activeVersionLabel
         );
-        const current = matched || json.activeDraft || null;
+        const current: DraftVersion | null =
+          matched || (json.activeDraft as DraftVersion | null) || null;
         setActiveDraft(current);
 
         if (current && current.claims) {
           setClaims(current.claims);
-          if (!selectedClaimId && current.claims.length > 0) {
+          if (
+            current.claims.length > 0 &&
+            (!selectedClaimId ||
+              !current.claims.some((c) => c.id === selectedClaimId))
+          ) {
             setSelectedClaimId(current.claims[0].id);
+          } else if (current.claims.length === 0) {
+            setSelectedClaimId("");
           }
+        } else {
+          setClaims([]);
+          setSelectedClaimId("");
         }
       }
 
@@ -115,6 +132,7 @@ export default function ReviewPage() {
       setIsLoading(false);
     }
   }, [
+    activeProjectId,
     audienceRole,
     fromVersion,
     toVersion,
@@ -149,7 +167,7 @@ export default function ReviewPage() {
           editedText,
           actorRole: currentRole,
           reviewerName: currentProfile.name,
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole,
         }),
       });
@@ -200,7 +218,7 @@ export default function ReviewPage() {
           customText,
           actorRole: currentRole,
           reviewerName: currentProfile.name,
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole,
         }),
       });
@@ -248,7 +266,7 @@ export default function ReviewPage() {
           action: "approve_handover",
           actorRole: currentRole,
           reviewerName: currentProfile.name,
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole,
         }),
       });
@@ -388,8 +406,8 @@ export default function ReviewPage() {
 
   return (
     <main className="w-full space-y-5">
-      <StepGuideBanner stepLabel="STEP 3 OF 4 • REVIEW & APPROVE">
-        Click any <strong>View Proof</strong> button to inspect the exact quote from project files, resolve the Purple date conflict, and click <strong>Approve &amp; Publish Handover →</strong>
+      <StepGuideBanner stepLabel={`STEP 3 OF 4 • REVIEW & APPROVE • ${activeProjectName}`}>
+        Reviewing <strong>{activeProjectName}</strong>. Click any <strong>View Proof</strong> button to inspect the exact quote from project files, resolve any conflicts, and click <strong>Approve &amp; Publish Handover →</strong>
       </StepGuideBanner>
 
       {/* ==================================================================== */}

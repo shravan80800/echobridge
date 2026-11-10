@@ -1,7 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import type { Role, PersonaProfile } from "@/types/echobridge.types";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import type { Role, PersonaProfile, Project } from "@/types/echobridge.types";
 import { PERSONA_PROFILES } from "@/types/echobridge.types";
 
 export interface RolePermissionBannerInfo {
@@ -57,6 +63,18 @@ export const ROLE_PERMISSION_BANNERS: Record<Role, RolePermissionBannerInfo> = {
   },
 };
 
+export const DEFAULT_CAMPUSCONNECT_PROJECT: Project = {
+  id: "CampusConnect",
+  name: "CampusConnect",
+  description:
+    "Synthetic multi-modal college event club portal benchmark workspace.",
+  freshness_threshold_days: 180,
+  created_at: "2026-03-01T00:00:00Z",
+};
+
+const STORAGE_PROJECT_ID_KEY = "echobridge_active_project_id";
+const STORAGE_PROJECT_NAME_KEY = "echobridge_active_project_name";
+
 interface RoleContextValue {
   currentRole: Role;
   currentProfile: PersonaProfile;
@@ -66,30 +84,128 @@ interface RoleContextValue {
   toggleAuditDrawer: () => void;
   openAuditDrawer: () => void;
   closeAuditDrawer: () => void;
+  activeProjectId: string;
+  activeProjectName: string;
+  projects: Project[];
+  refreshProjects: () => Promise<Project[]>;
+  setActiveProject: (projectId: string, projectName?: string) => void;
 }
+
+const DEFAULT_ROLE_CONTEXT: RoleContextValue = {
+  currentRole: "reviewer",
+  currentProfile: PERSONA_PROFILES.reviewer,
+  bannerInfo: ROLE_PERMISSION_BANNERS.reviewer,
+  switchRole: () => {},
+  isAuditDrawerOpen: false,
+  toggleAuditDrawer: () => {},
+  openAuditDrawer: () => {},
+  closeAuditDrawer: () => {},
+  activeProjectId: "CampusConnect",
+  activeProjectName: "CampusConnect",
+  projects: [DEFAULT_CAMPUSCONNECT_PROJECT],
+  refreshProjects: async () => [DEFAULT_CAMPUSCONNECT_PROJECT],
+  setActiveProject: () => {},
+};
 
 const RoleContext = createContext<RoleContextValue | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [currentRole, setCurrentRole] = useState<Role>("reviewer");
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string>("CampusConnect");
+  const [activeProjectName, setActiveProjectName] =
+    useState<string>("CampusConnect");
+  const [projects, setProjects] = useState<Project[]>([
+    DEFAULT_CAMPUSCONNECT_PROJECT,
+  ]);
+
+  const refreshProjects = useCallback(async (): Promise<Project[]> => {
+    try {
+      const res = await fetch("/api/projects", { cache: "no-store" });
+      const json = await res.json();
+      if (json?.success && Array.isArray(json.projects) && json.projects.length > 0) {
+        const fetched = json.projects as Project[];
+        setProjects(fetched);
+        return fetched;
+      }
+    } catch {
+      // Keep current projects list cleanly in offline/test contexts
+    }
+    return [DEFAULT_CAMPUSCONNECT_PROJECT];
+  }, []);
 
   useEffect(() => {
-    // Read persisted role from cookie or localStorage if available
+    let initialProjectId = "CampusConnect";
     try {
-      const stored = localStorage.getItem("echobridge_role") as Role | null;
+      const storedRole = localStorage.getItem("echobridge_role") as Role | null;
       if (
-        stored &&
-        ["departing_member", "reviewer", "incoming_lead", "incoming_intern"].includes(
-          stored
-        )
+        storedRole &&
+        [
+          "departing_member",
+          "reviewer",
+          "incoming_lead",
+          "incoming_intern",
+        ].includes(storedRole)
       ) {
-        setCurrentRole(stored);
+        setCurrentRole(storedRole);
+      }
+
+      const storedProjectId = localStorage.getItem(STORAGE_PROJECT_ID_KEY);
+      const storedProjectName = localStorage.getItem(STORAGE_PROJECT_NAME_KEY);
+      if (storedProjectId && storedProjectId.trim()) {
+        initialProjectId = storedProjectId.trim();
+        setActiveProjectId(initialProjectId);
+        setActiveProjectName(storedProjectName?.trim() || initialProjectId);
       }
     } catch {
       // Ignore in non-browser/restricted environments
     }
-  }, []);
+
+    refreshProjects().then((fetched) => {
+      const matched = fetched.find((p) => p.id === initialProjectId);
+      if (matched) {
+        setActiveProjectName(matched.name);
+        try {
+          localStorage.setItem(STORAGE_PROJECT_NAME_KEY, matched.name);
+        } catch {
+          // Ignore storage error
+        }
+      } else if (
+        initialProjectId !== "CampusConnect" &&
+        fetched.some((p) => p.id === "CampusConnect")
+      ) {
+        // Fallback safely if ephemeral workspace expired across cold restarts
+        setActiveProjectId("CampusConnect");
+        setActiveProjectName("CampusConnect");
+        try {
+          localStorage.setItem(STORAGE_PROJECT_ID_KEY, "CampusConnect");
+          localStorage.setItem(STORAGE_PROJECT_NAME_KEY, "CampusConnect");
+        } catch {
+          // Ignore storage error
+        }
+      }
+    });
+  }, [refreshProjects]);
+
+  const setActiveProject = useCallback(
+    (projectId: string, projectName?: string) => {
+      const nextId = projectId?.trim() || "CampusConnect";
+      const matched = projects.find((p) => p.id === nextId);
+      const nextName =
+        projectName?.trim() || matched?.name || nextId;
+
+      setActiveProjectId(nextId);
+      setActiveProjectName(nextName);
+
+      try {
+        localStorage.setItem(STORAGE_PROJECT_ID_KEY, nextId);
+        localStorage.setItem(STORAGE_PROJECT_NAME_KEY, nextName);
+      } catch {
+        // Ignore storage failure
+      }
+    },
+    [projects]
+  );
 
   const switchRole = (newRole: Role) => {
     const prevRole = currentRole;
@@ -99,18 +215,18 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("echobridge_role", newRole);
       document.cookie = `echobridge_role=${newRole}; path=/; max-age=86400; SameSite=Lax`;
 
-      // Log role_switched event asynchronously
       fetch("/api/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_id: "CampusConnect",
+          project_id: activeProjectId,
           actor_role: newRole,
           actor_name: PERSONA_PROFILES[newRole].name,
           event_type: "role_switched",
           details_json: {
             from_role: prevRole,
             to_role: newRole,
+            project_id: activeProjectId,
             timestamp: new Date().toISOString(),
           },
         }),
@@ -140,6 +256,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         toggleAuditDrawer,
         openAuditDrawer,
         closeAuditDrawer,
+        activeProjectId,
+        activeProjectName,
+        projects,
+        refreshProjects,
+        setActiveProject,
       }}
     >
       {children}
@@ -147,10 +268,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useRole() {
+export function useRole(): RoleContextValue {
   const context = useContext(RoleContext);
-  if (!context) {
-    throw new Error("useRole must be used within a RoleProvider");
-  }
-  return context;
+  return context ?? DEFAULT_ROLE_CONTEXT;
 }

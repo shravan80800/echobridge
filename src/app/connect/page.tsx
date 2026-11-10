@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { StepGuideBanner } from "@/components/ui/StepGuideBanner";
 import { LoadingSkeleton, ErrorBanner } from "@/components/ui/StateViews";
 import { RedactionQuarantineTable } from "@/components/review/RedactionQuarantineTable";
+import { useRole } from "@/components/layout/RoleContext";
 import type {
   QuarantinedSecret,
   Source,
@@ -52,6 +53,12 @@ const SOURCE_SUBTITLES: Record<string, string> = {
 
 export default function ConnectPage() {
   const router = useRouter();
+  const {
+    activeProjectId,
+    activeProjectName,
+    refreshProjects,
+    setActiveProject,
+  } = useRole();
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResettingSeed, setIsResettingSeed] = useState(false);
@@ -75,6 +82,9 @@ export default function ConnectPage() {
 
   // Live URL Importer State (GitHub & Public Google Docs) — Expanded by default as headline feature
   const [isLiveImporterOpen, setIsLiveImporterOpen] = useState(true);
+  const [importMode, setImportMode] = useState<"new_workspace" | "append">(
+    "new_workspace"
+  );
   const [githubUrl, setGithubUrl] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [isImportingGithub, setIsImportingGithub] = useState(false);
@@ -83,27 +93,36 @@ export default function ConnectPage() {
   const liveImportSectionRef = useRef<HTMLDivElement | null>(null);
   const githubInputRef = useRef<HTMLInputElement | null>(null);
 
-  const fetchIngestionData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch("/api/ingest?projectId=CampusConnect", {
-        cache: "no-store",
-      });
-      const json = await res.json();
-      if (!json.success) {
-        throw new Error(json.error || "Failed to load project sources");
-      }
+  const fetchIngestionData = useCallback(
+    async (overrideProjectId?: string) => {
+      const targetId = overrideProjectId || activeProjectId;
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(
+          `/api/ingest?projectId=${encodeURIComponent(targetId)}`,
+          {
+            cache: "no-store",
+          }
+        );
+        const json = await res.json();
+        if (!json.success) {
+          throw new Error(json.error || "Failed to load project sources");
+        }
 
-      setSources(json.sources || []);
-      setAclScopeMap(json.aclScopeMap || []);
-      setQuarantinedSecrets(json.quarantinedSecrets || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error fetching sources");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setSources(json.sources || []);
+        setAclScopeMap(json.aclScopeMap || []);
+        setQuarantinedSecrets(json.quarantinedSecrets || []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Error fetching sources"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeProjectId]
+  );
 
   useEffect(() => {
     fetchIngestionData();
@@ -154,7 +173,9 @@ export default function ConnectPage() {
         throw new Error(json.error || "Failed to reload baseline seed data");
       }
 
-      await fetchIngestionData();
+      setActiveProject("CampusConnect", "CampusConnect");
+      await refreshProjects();
+      await fetchIngestionData("CampusConnect");
       setSuccessBanner(
         "Project sources, drafts, and handover receipts reset cleanly to CampusConnect baseline."
       );
@@ -174,7 +195,7 @@ export default function ConnectPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole: "both",
           showRestrictedPlaceholders: true,
         }),
@@ -199,7 +220,7 @@ export default function ConnectPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           sources: [
             {
               title: customTitle,
@@ -221,7 +242,7 @@ export default function ConnectPage() {
       setCustomTitle("");
       setCustomContent("");
       setSuccessBanner(
-        "Source added and automatically scanned for sensitive items."
+        `Source added to "${activeProjectName}" and automatically scanned for sensitive items.`
       );
       await fetchIngestionData();
     } catch (err) {
@@ -255,7 +276,8 @@ export default function ConnectPage() {
           type: importType,
           url: trimmedUrl,
           token: token?.trim() || undefined,
-          projectId: "CampusConnect",
+          mode: importMode,
+          projectId: activeProjectId,
         }),
       });
 
@@ -270,10 +292,17 @@ export default function ConnectPage() {
         setGoogleDocUrl("");
       }
 
+      await refreshProjects();
+      const targetId: string = json.projectId || activeProjectId;
+      const targetName: string = json.projectName || activeProjectName;
+      if (json.projectId) {
+        setActiveProject(targetId, targetName);
+      }
+
       setSuccessBanner(
         `${json.message || "Live content ingested and draft updated."} (${json.sourcesIngested ?? 1} source${json.sourcesIngested === 1 ? "" : "s"}, ${json.chunksCreated ?? 0} chunks indexed).`
       );
-      await fetchIngestionData();
+      await fetchIngestionData(targetId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import live URL");
     } finally {
@@ -331,7 +360,11 @@ export default function ConnectPage() {
   return (
     <main className="w-full space-y-6">
       <StepGuideBanner stepLabel="STEP 1 OF 4 • CONNECT SOURCES">
-        EchoBridge scanned 8 project files and automatically hid 2 secrets. Review the file access permissions below, then click <strong>Generate Handover Draft →</strong>
+        EchoBridge scanned {sources.length} project file
+        {sources.length === 1 ? "" : "s"} in{" "}
+        <strong>{activeProjectName}</strong> and automatically hid{" "}
+        {secretCount} secret{secretCount === 1 ? "" : "s"}. Review access below,
+        then click <strong>Generate Handover Draft →</strong>
       </StepGuideBanner>
 
       {/* ==================================================================== */}
@@ -339,9 +372,14 @@ export default function ConnectPage() {
       {/* ==================================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            1. Project Sources &amp; Access Scope
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              1. Project Sources &amp; Access Scope
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+              Workspace: {activeProjectName}
+            </span>
+          </div>
           <p className="text-sm text-slate-600 mt-1">
             Select which project files to include and verify who is allowed to see them.
           </p>
@@ -398,7 +436,9 @@ export default function ConnectPage() {
         </div>
       )}
 
-      {error && <ErrorBanner message={error} onRetry={fetchIngestionData} />}
+      {error && (
+        <ErrorBanner message={error} onRetry={() => fetchIngestionData()} />
+      )}
 
       {/* ==================================================================== */}
       {/* 1B. ABOVE-THE-FOLD SPOTLIGHT: LIVE GITHUB & GOOGLE DOCS IMPORTER      */}
@@ -441,7 +481,41 @@ export default function ConnectPage() {
         </div>
 
         {isLiveImporterOpen && (
-          <div className="border-t border-teal-200/80 bg-white/60 p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="border-t border-teal-200/80 bg-white/60 p-4 sm:p-5 space-y-4">
+            {/* Workspace Mode Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl bg-teal-50/70 border border-teal-200 p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportMode("new_workspace")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                    importMode === "new_workspace"
+                      ? "bg-teal-700 text-white border-teal-700 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  ✨ Create Separate Project Workspace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode("append")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                    importMode === "append"
+                      ? "bg-teal-700 text-white border-teal-700 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  ➕ Add to Current Project ({activeProjectName})
+                </button>
+              </div>
+              <span className="text-[11px] text-teal-900 px-1">
+                {importMode === "new_workspace"
+                  ? "Creates an isolated workspace with its own draft, gap interview, review & certificate."
+                  : `Merges imported sources directly into ${activeProjectName}.`}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Panel A: GitHub Repository Importer */}
             <form
               onSubmit={handleGitHubImport}
@@ -579,6 +653,7 @@ export default function ConnectPage() {
                 {isImportingDoc ? "Importing Doc..." : "Import Google Doc →"}
               </Button>
             </form>
+            </div>
           </div>
         )}
       </div>

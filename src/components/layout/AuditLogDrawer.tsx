@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   History,
   X,
@@ -36,15 +36,23 @@ const eventBadgeColors: Partial<Record<AuditEventType, string>> = {
 };
 
 export function AuditLogDrawer() {
-  const { isAuditDrawerOpen, closeAuditDrawer } = useRole();
+  const {
+    isAuditDrawerOpen,
+    closeAuditDrawer,
+    activeProjectId,
+    activeProjectName,
+  } = useRole();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
-  const fetchAuditEvents = async () => {
+  const fetchAuditEvents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/audit?projectId=CampusConnect&limit=50");
+      const res = await fetch(
+        `/api/audit?projectId=${encodeURIComponent(activeProjectId)}&limit=50`,
+        { cache: "no-store" }
+      );
       const data = await res.json();
       if (data.success && Array.isArray(data.events)) {
         setEvents(data.events);
@@ -54,13 +62,13 @@ export function AuditLogDrawer() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeProjectId]);
 
   useEffect(() => {
     if (isAuditDrawerOpen) {
       fetchAuditEvents();
     }
-  }, [isAuditDrawerOpen]);
+  }, [isAuditDrawerOpen, fetchAuditEvents]);
 
   if (!isAuditDrawerOpen) return null;
 
@@ -90,7 +98,7 @@ export function AuditLogDrawer() {
                 Activity Log
               </h3>
               <p className="text-xs text-slate-500">
-                Recorded actions for Project: CampusConnect
+                Recorded actions for Project: {activeProjectName}
               </p>
             </div>
           </div>

@@ -11,7 +11,7 @@ import { GapQuestionCard } from "@/components/interview/GapQuestionCard";
 import type { GapQuestion } from "@/types/echobridge.types";
 
 export default function GapInterviewPage() {
-  const { currentRole } = useRole();
+  const { currentRole, activeProjectId, activeProjectName } = useRole();
   const [questions, setQuestions] = useState<GapQuestion[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -24,28 +24,31 @@ export default function GapInterviewPage() {
     try {
       setIsLoading(true);
       const res = await fetch(
-        "/api/gap-interview?projectId=CampusConnect&role=incoming_lead",
+        `/api/gap-interview?projectId=${encodeURIComponent(activeProjectId)}&role=incoming_lead`,
         { cache: "no-store" }
       );
       const json = await res.json();
       if (json.success) {
         const fetchedQuestions: GapQuestion[] = json.questions || [];
         setQuestions(fetchedQuestions);
-        if (!activeQuestionId && fetchedQuestions.length > 0) {
+        setActiveQuestionId((prev) => {
+          if (prev && fetchedQuestions.some((q) => q.id === prev)) {
+            return prev;
+          }
           const firstPending = fetchedQuestions.find(
             (q) => q.status === "pending"
           );
-          setActiveQuestionId(
-            firstPending ? firstPending.id : fetchedQuestions[0].id
-          );
-        }
+          return firstPending
+            ? firstPending.id
+            : fetchedQuestions[0]?.id || "";
+        });
       }
     } catch (err) {
       console.error("Failed to fetch interview questions:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeQuestionId]);
+  }, [activeProjectId]);
 
   useEffect(() => {
     fetchInterviewData();
@@ -67,7 +70,7 @@ export default function GapInterviewPage() {
           questionId,
           answerText,
           answeredBy: departingName,
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole: "incoming_lead",
         }),
       });
@@ -94,7 +97,7 @@ export default function GapInterviewPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "sudden_exit",
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           assignedFallbackContact: "Prof. Deshmukh (Faculty Mentor, CS Dept)",
           audienceRole: "incoming_lead",
         }),
@@ -123,7 +126,7 @@ export default function GapInterviewPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reset",
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
         }),
       });
       const json = await res.json();
@@ -171,9 +174,14 @@ export default function GapInterviewPage() {
       {/* ==================================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            2. Targeted Gap Interview
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              2. Targeted Gap Interview
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+              {activeProjectName}
+            </span>
+          </div>
           <p className="text-sm text-slate-600 mt-1">
             Help fill in unwritten project decisions that aren&apos;t in your files.
           </p>

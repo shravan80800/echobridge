@@ -28,7 +28,7 @@ import type {
 } from "@/types/echobridge.types";
 
 export default function DraftPage() {
-  const { currentRole } = useRole();
+  const { currentRole, activeProjectId } = useRole();
 
   const [selectedAudience, setSelectedAudience] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
@@ -65,9 +65,12 @@ export default function DraftPage() {
       setLoading(true);
       setError(null);
 
+      const encodedProject = encodeURIComponent(activeProjectId);
       const [draftRes, ingestRes] = await Promise.all([
-        fetch("/api/reconstruct?projectId=CampusConnect", { cache: "no-store" }),
-        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
+        fetch(`/api/reconstruct?projectId=${encodedProject}`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/ingest?projectId=${encodedProject}`, { cache: "no-store" }),
       ]);
 
       const draftJson = await draftRes.json();
@@ -85,7 +88,7 @@ export default function DraftPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     fetchDraftData();

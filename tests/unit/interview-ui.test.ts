@@ -128,5 +128,32 @@ describe("Stage 4 UI: GapQuestionCard & SuddenExitFallbackBanner (TASK-018)", ()
       expect(html).toContain("Prof. Deshmukh (Faculty Mentor, CS Dept)");
       expect(html).toContain("Reset Mode");
     });
+
+    it("renders custom project gap headline without CampusConnect staging copy", () => {
+      const customRepoGap: GapQuestion = {
+        id: "GAP-GH-ECHOBRIDGE-01",
+        project_id: "gh-shravan80800-echobridge",
+        claim_id: "CLM-CUSTOM-GH-LEAD-CHK-1",
+        question_text:
+          "Why was the core architecture in shravan80800/echobridge chosen?",
+        context_summary: "Derived from README: echobridge",
+        status: "pending",
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(GapQuestionCard, {
+          question: customRepoGap,
+          currentIndex: 0,
+          totalCount: 3,
+          cleanMode: true,
+          onSubmitAnswer: async () => {},
+        })
+      );
+
+      expect(html).toContain(
+        "Why was the core architecture in shravan80800/echobridge chosen?"
+      );
+      expect(html).not.toContain("staging deployment details");
+    });
   });
 });

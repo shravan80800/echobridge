@@ -24,11 +24,13 @@ import type {
 } from "@/types/echobridge.types";
 
 export default function HandoverPage() {
-  const { currentRole } = useRole();
+  const { currentRole, activeProjectId, activeProjectName } = useRole();
   const [audienceRole, setAudienceRole] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
   );
 
+  const [resolvedProjectName, setResolvedProjectName] =
+    useState<string>(activeProjectName);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [questions, setQuestions] = useState<ComprehensionQuestion[]>([]);
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
@@ -59,6 +61,11 @@ export default function HandoverPage() {
     }
   }, [currentRole]);
 
+  // Sync resolved project display name when active workspace changes
+  useEffect(() => {
+    setResolvedProjectName(activeProjectName);
+  }, [activeProjectName]);
+
   const recipientName =
     audienceRole === "incoming_lead" ? "Riya Patel" : "Kabir Mehta";
   const recipientRoleName =
@@ -69,26 +76,30 @@ export default function HandoverPage() {
   const fetchHandoverData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [receiptRes, reviewRes, ingestRes] = await Promise.all([
-        fetch(`/api/receipt?projectId=CampusConnect&role=${audienceRole}`, {
+      const encodedProject = encodeURIComponent(activeProjectId);
+      const [handoverRes, reviewRes, ingestRes] = await Promise.all([
+        fetch(`/api/handover?projectId=${encodedProject}&role=${audienceRole}`, {
           cache: "no-store",
         }),
         fetch(
-          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`,
+          `/api/review?projectId=${encodedProject}&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`,
           { cache: "no-store" }
         ),
-        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
+        fetch(`/api/ingest?projectId=${encodedProject}`, { cache: "no-store" }),
       ]);
 
-      const [receiptJson, reviewJson, ingestJson] = await Promise.all([
-        receiptRes.json(),
+      const [handoverJson, reviewJson, ingestJson] = await Promise.all([
+        handoverRes.json(),
         reviewRes.json(),
         ingestRes.json(),
       ]);
 
-      if (receiptJson.success) {
-        setReceipt(receiptJson.receipt || null);
-        setQuestions(receiptJson.questions || []);
+      if (handoverJson.success) {
+        setReceipt(handoverJson.receipt || null);
+        setQuestions(handoverJson.questions || []);
+        if (handoverJson.projectName) {
+          setResolvedProjectName(handoverJson.projectName);
+        }
       }
 
       if (reviewJson.success) {
@@ -98,6 +109,8 @@ export default function HandoverPage() {
         const currentDraft = v2 || reviewJson.activeDraft || null;
         if (currentDraft && currentDraft.claims) {
           setClaims(currentDraft.claims);
+        } else {
+          setClaims([]);
         }
       }
 
@@ -109,7 +122,7 @@ export default function HandoverPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [audienceRole]);
+  }, [activeProjectId, audienceRole]);
 
   useEffect(() => {
     fetchHandoverData();
@@ -124,13 +137,13 @@ export default function HandoverPage() {
       setIsSubmitting(true);
       setFeedbackMessage(null);
 
-      const res = await fetch("/api/receipt", {
+      const res = await fetch("/api/handover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
           action: "acknowledge",
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole,
           incomingUserName: recipientName,
           answers,
@@ -160,13 +173,13 @@ export default function HandoverPage() {
     try {
       setIsResettingReceipt(true);
       setFeedbackMessage(null);
-      const res = await fetch("/api/receipt", {
+      const res = await fetch("/api/handover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
           action: "reset",
-          projectId: "CampusConnect",
+          projectId: activeProjectId,
           audienceRole,
         }),
       });
@@ -296,8 +309,13 @@ export default function HandoverPage() {
 
   return (
     <main className="w-full space-y-6">
-      <StepGuideBanner stepLabel="STEP 4 OF 4 • FINAL HANDOVER & RECEIPT">
-        Compare <strong>Team Lead (Riya)</strong> vs. <strong>Intern (Kabir)</strong> views to see how confidential Finance data is protected, then click <strong>Acknowledge</strong> to generate your signed receipt.
+      <StepGuideBanner
+        stepLabel={`STEP 4 OF 4 • FINAL HANDOVER & RECEIPT • ${resolvedProjectName || activeProjectName}`}
+      >
+        Handover for <strong>{resolvedProjectName || activeProjectName}</strong>.
+        Compare <strong>Team Lead (Riya)</strong> vs.{" "}
+        <strong>Intern (Kabir)</strong> views, then click{" "}
+        <strong>Acknowledge</strong> to generate your signed 1-page certificate.
       </StepGuideBanner>
 
       {/* ==================================================================== */}
@@ -502,7 +520,7 @@ export default function HandoverPage() {
         isOpen={isCertificateModalOpen}
         onClose={() => setIsCertificateModalOpen(false)}
         receipt={receipt}
-        projectName="CampusConnect"
+        projectName={resolvedProjectName || activeProjectName}
         approverName="Prof. Deshmukh (Project Mentor)"
       />
 
