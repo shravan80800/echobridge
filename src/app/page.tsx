@@ -102,6 +102,19 @@ export default function HomePage() {
           the departing member only about what&apos;s missing, and lets a mentor
           approve role-based views before sharing.
         </p>
+
+        <div className="pt-1 flex flex-col items-center gap-2">
+          <Link
+            href="/connect#live-import"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 shadow-sm transition-colors"
+          >
+            <span>⚡ Import Any Live GitHub Repo or Public Google Doc — Zero OAuth</span>
+            <ArrowRight className="w-4 h-4 shrink-0" />
+          </Link>
+          <p className="text-xs text-slate-500">
+            Works immediately with any public repo or shared Google Doc — secrets and prompt injections are stripped automatically.
+          </p>
+        </div>
       </section>
 
       {/* ==================================================================== */}

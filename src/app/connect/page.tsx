@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -73,13 +73,15 @@ export default function ConnectPage() {
   const [customContent, setCustomContent] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
-  // Live URL Importer State (GitHub & Public Google Docs)
-  const [isLiveImporterOpen, setIsLiveImporterOpen] = useState(false);
+  // Live URL Importer State (GitHub & Public Google Docs) — Expanded by default as headline feature
+  const [isLiveImporterOpen, setIsLiveImporterOpen] = useState(true);
   const [githubUrl, setGithubUrl] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [isImportingGithub, setIsImportingGithub] = useState(false);
   const [googleDocUrl, setGoogleDocUrl] = useState("");
   const [isImportingDoc, setIsImportingDoc] = useState(false);
+  const liveImportSectionRef = useRef<HTMLDivElement | null>(null);
+  const githubInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchIngestionData = useCallback(async () => {
     try {
@@ -106,6 +108,30 @@ export default function ConnectPage() {
   useEffect(() => {
     fetchIngestionData();
   }, [fetchIngestionData]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#live-import") {
+      setIsLiveImporterOpen(true);
+      setTimeout(() => {
+        liveImportSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        githubInputRef.current?.focus();
+      }, 150);
+    }
+  }, []);
+
+  const handleJumpToLiveImporter = () => {
+    setIsLiveImporterOpen(true);
+    liveImportSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    setTimeout(() => {
+      githubInputRef.current?.focus();
+    }, 180);
+  };
 
   const handleReloadSeed = async () => {
     try {
@@ -332,6 +358,14 @@ export default function ConnectPage() {
 
           <Button
             variant="secondary"
+            onClick={handleJumpToLiveImporter}
+            className="border-teal-300 bg-teal-50/70 text-teal-800 hover:bg-teal-100"
+          >
+            🔗 Import GitHub / Doc
+          </Button>
+
+          <Button
+            variant="secondary"
             onClick={() => setIsModalOpen(true)}
           >
             ➕ Add Source
@@ -367,47 +401,25 @@ export default function ConnectPage() {
       {error && <ErrorBanner message={error} onRetry={fetchIngestionData} />}
 
       {/* ==================================================================== */}
-      {/* 2. PLAIN-ENGLISH PRIVACY & SAFETY SUMMARY STRIP                      */}
+      {/* 1B. ABOVE-THE-FOLD SPOTLIGHT: LIVE GITHUB & GOOGLE DOCS IMPORTER      */}
       {/* ==================================================================== */}
-      <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-sm text-slate-800 leading-relaxed">
-          {safetySummaryText}
-        </p>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setShowHiddenItems((prev) => !prev)}
-          className="shrink-0 self-start sm:self-center"
-        >
-          {showHiddenItems
-            ? `Hide Hidden Items (${quarantinedSecrets.length})`
-            : `View Hidden Items (${quarantinedSecrets.length})`}
-        </Button>
-      </div>
-
-      {/* Collapsible Quarantine Table */}
-      {showHiddenItems && (
-        <RedactionQuarantineTable secrets={quarantinedSecrets} />
-      )}
-
-      {/* ==================================================================== */}
-      {/* 2B. COLLAPSIBLE LIVE URL IMPORTER (GITHUB & PUBLIC GOOGLE DOCS)     */}
-      {/* ==================================================================== */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="p-2 rounded-lg bg-teal-50 border border-teal-200 text-teal-700 shrink-0">
-              <Globe className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">
-                Connect Live GitHub Repo or Google Doc URL
-              </h2>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Import live README, commits, issues, PRs, or public Google Docs directly — no OAuth needed.
-              </p>
-            </div>
+      <div
+        id="live-import"
+        ref={liveImportSectionRef}
+        className="scroll-mt-24 rounded-2xl border-2 border-teal-300 bg-gradient-to-br from-teal-50/70 via-white to-white shadow-sm overflow-hidden"
+      >
+        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-700 text-white text-[11px] font-bold uppercase tracking-wider">
+              <Globe className="w-3 h-3 shrink-0" />
+              <span>⚡ Live Import • No OAuth Needed</span>
+            </span>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">
+              Import Live GitHub Repo or Public Google Doc
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600">
+              Paste any repo or shared doc link — EchoBridge fetches live files, redacts secrets automatically, and updates your verified handover draft.
+            </p>
           </div>
 
           <Button
@@ -422,36 +434,51 @@ export default function ConnectPage() {
                 <ChevronDown className="w-3.5 h-3.5" />
               )
             }
-            className="shrink-0 self-start sm:self-center"
+            className="shrink-0 self-start"
           >
-            {isLiveImporterOpen ? "Hide Importer" : "Open Importer"}
+            {isLiveImporterOpen ? "Hide Importer" : "Show Importer"}
           </Button>
         </div>
 
         {isLiveImporterOpen && (
-          <div className="border-t border-slate-200 bg-slate-50/50 p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="border-t border-teal-200/80 bg-white/60 p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Panel A: GitHub Repository Importer */}
             <form
               onSubmit={handleGitHubImport}
-              className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-3"
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between space-y-3"
             >
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <GitBranch className="w-4 h-4 text-teal-700 shrink-0" />
                     <h3 className="text-sm font-semibold text-slate-900">
                       GitHub Repository
                     </h3>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setGithubUrl("https://github.com/shravan80800/echobridge")
-                    }
-                    className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline cursor-pointer"
-                  >
-                    Try sample repo
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGithubUrl("https://github.com/shravan80800/echobridge");
+                        githubInputRef.current?.focus();
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200 text-[11px] font-semibold text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer"
+                    >
+                      Try EchoBridge Repo
+                    </button>
+                    {(githubUrl || githubToken) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGithubUrl("");
+                          setGithubToken("");
+                        }}
+                        className="text-[11px] font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -459,6 +486,7 @@ export default function ConnectPage() {
                     Repository URL
                   </label>
                   <input
+                    ref={githubInputRef}
                     type="text"
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
@@ -501,14 +529,25 @@ export default function ConnectPage() {
             {/* Panel B: Public Google Doc Importer */}
             <form
               onSubmit={handleGoogleDocImport}
-              className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-3"
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between space-y-3"
             >
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Link2 className="w-4 h-4 text-teal-700 shrink-0" />
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Google Doc (Public Link)
-                  </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-teal-700 shrink-0" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Google Doc (Public Link)
+                    </h3>
+                  </div>
+                  {googleDocUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setGoogleDocUrl("")}
+                      className="text-[11px] font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div>
@@ -524,7 +563,7 @@ export default function ConnectPage() {
                     required
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Make sure link sharing is set to &ldquo;Anyone with the link can view&rdquo;.
+                    In Google Docs: Share → Anyone with the link → Viewer.
                   </p>
                 </div>
               </div>
@@ -543,6 +582,31 @@ export default function ConnectPage() {
           </div>
         )}
       </div>
+
+      {/* ==================================================================== */}
+      {/* 2. PLAIN-ENGLISH PRIVACY & SAFETY SUMMARY STRIP                      */}
+      {/* ==================================================================== */}
+      <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm text-slate-800 leading-relaxed">
+          {safetySummaryText}
+        </p>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowHiddenItems((prev) => !prev)}
+          className="shrink-0 self-start sm:self-center"
+        >
+          {showHiddenItems
+            ? `Hide Hidden Items (${quarantinedSecrets.length})`
+            : `View Hidden Items (${quarantinedSecrets.length})`}
+        </Button>
+      </div>
+
+      {/* Collapsible Quarantine Table */}
+      {showHiddenItems && (
+        <RedactionQuarantineTable secrets={quarantinedSecrets} />
+      )}
 
       {/* ==================================================================== */}
       {/* 3. CLEAN, MOBILE-FRIENDLY SOURCE LIST                                */}
