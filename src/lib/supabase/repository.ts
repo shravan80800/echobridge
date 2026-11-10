@@ -1696,11 +1696,87 @@ export class EchoBridgeRepository {
     }
   }
 
+  private async deleteProjectRowsInSupabase(
+    client: SupabaseClient,
+    projectId: string,
+    deleteProjectRow = false
+  ): Promise<void> {
+    await client.from("receipts").delete().eq("project_id", projectId);
+    await client.from("audit_events").delete().eq("project_id", projectId);
+    await client.from("gap_questions").delete().eq("project_id", projectId);
+    await client.from("claims").delete().eq("project_id", projectId);
+    await client.from("draft_versions").delete().eq("project_id", projectId);
+    await client
+      .from("quarantined_secrets")
+      .delete()
+      .eq("project_id", projectId);
+    await client.from("chunks").delete().eq("project_id", projectId);
+    await client.from("sources").delete().eq("project_id", projectId);
+    if (deleteProjectRow) {
+      await client.from("projects").delete().eq("id", projectId);
+    }
+  }
+
+  private removeProjectFromInMemoryMaps(projectId: string): void {
+    this.projects.delete(projectId);
+    for (const [id, item] of this.sources.entries()) {
+      if (item.project_id === projectId) this.sources.delete(id);
+    }
+    for (const [id, item] of this.chunks.entries()) {
+      if (item.project_id === projectId) this.chunks.delete(id);
+    }
+    for (const [id, item] of this.secrets.entries()) {
+      if (item.project_id === projectId) this.secrets.delete(id);
+    }
+    for (const [id, item] of this.drafts.entries()) {
+      if (item.project_id === projectId) this.drafts.delete(id);
+    }
+    for (const [id, item] of this.claims.entries()) {
+      if (item.project_id === projectId) this.claims.delete(id);
+    }
+    for (const [id, item] of this.gapQuestions.entries()) {
+      if (item.project_id === projectId) this.gapQuestions.delete(id);
+    }
+    for (const [id, item] of this.receipts.entries()) {
+      if (item.project_id === projectId) this.receipts.delete(id);
+    }
+    this.auditEvents = this.auditEvents.filter(
+      (e) => e.project_id !== projectId
+    );
+    this.verifiedSeeded.delete(projectId);
+    this.seedingLocks.delete(projectId);
+  }
+
   /**
-   * Full Reset for Reload Seed: resets BOTH in-memory store and Supabase tables
-   * for the specified project back to the clean CampusConnect baseline.
+   * Deletes a custom imported workspace (projectId !== "CampusConnect") and all
+   * dependent entities from both the in-memory store and Supabase.
    */
-  public async resetProjectStore(projectId = "CampusConnect"): Promise<void> {
+  public async deleteProjectWorkspace(projectId: string): Promise<boolean> {
+    if (!projectId || projectId === "CampusConnect") {
+      return false;
+    }
+
+    this.removeProjectFromInMemoryMaps(projectId);
+
+    if (!this.isConfigured()) return true;
+
+    const client = getSupabaseServerClient();
+    if (!client) return true;
+
+    try {
+      await this.deleteProjectRowsInSupabase(client, projectId, true);
+    } catch (err) {
+      console.warn("[Supabase] deleteProjectWorkspace warning:", err);
+    }
+
+    return true;
+  }
+
+  /**
+   * Resets all workspaces: removes all custom imported workspaces and restores
+   * "CampusConnect" back to its clean baseline seed state.
+   */
+  public async resetAllWorkspaces(): Promise<void> {
     this.resetInMemoryStore(true);
 
     if (!this.isConfigured()) return;
@@ -1709,23 +1785,35 @@ export class EchoBridgeRepository {
     if (!client) return;
 
     try {
-      await client.from("receipts").delete().eq("project_id", projectId);
-      await client.from("audit_events").delete().eq("project_id", projectId);
-      await client.from("gap_questions").delete().eq("project_id", projectId);
-      await client.from("claims").delete().eq("project_id", projectId);
-      await client.from("draft_versions").delete().eq("project_id", projectId);
-      await client
-        .from("quarantined_secrets")
-        .delete()
-        .eq("project_id", projectId);
-      await client.from("chunks").delete().eq("project_id", projectId);
-      await client.from("sources").delete().eq("project_id", projectId);
+      await client.from("projects").delete().neq("id", "CampusConnect");
+      await this.deleteProjectRowsInSupabase(client, "CampusConnect", false);
+      this.verifiedSeeded.delete("CampusConnect");
+      await this.seedSupabaseCampusConnect(client);
+      this.verifiedSeeded.add("CampusConnect");
+    } catch (err) {
+      console.warn("[Supabase] resetAllWorkspaces warning:", err);
+    }
+  }
 
-      this.verifiedSeeded.delete(projectId);
-      if (projectId === "CampusConnect") {
-        await this.seedSupabaseCampusConnect(client);
-        this.verifiedSeeded.add(projectId);
-      }
+  /**
+   * Full Reset for Reload Seed: resets BOTH in-memory store and Supabase tables
+   * back to the clean CampusConnect baseline (clears custom workspaces too).
+   */
+  public async resetProjectStore(projectId = "CampusConnect"): Promise<void> {
+    if (!projectId || projectId === "all" || projectId === "CampusConnect") {
+      await this.resetAllWorkspaces();
+      return;
+    }
+
+    this.removeProjectFromInMemoryMaps(projectId);
+
+    if (!this.isConfigured()) return;
+
+    const client = getSupabaseServerClient();
+    if (!client) return;
+
+    try {
+      await this.deleteProjectRowsInSupabase(client, projectId, false);
     } catch (err) {
       console.warn("[Supabase] resetProjectStore warning:", err);
     }

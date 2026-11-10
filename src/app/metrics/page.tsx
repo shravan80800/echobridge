@@ -19,13 +19,14 @@ import { useRole } from "@/components/layout/RoleContext";
 import type { SystemMetricsReport } from "@/services/trust/metrics.service";
 
 export default function MetricsPage() {
-  const { activeProjectId, activeProjectName } = useRole();
+  const { activeProjectId, activeProjectName, workspaceRevision } = useRole();
   const [metrics, setMetrics] = useState<SystemMetricsReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const fetchMetrics = useCallback(async () => {
+    void workspaceRevision;
     try {
       setIsLoading(true);
       const res = await fetch(
@@ -44,7 +45,7 @@ export default function MetricsPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, workspaceRevision]);
 
   useEffect(() => {
     fetchMetrics();

@@ -28,7 +28,7 @@ import type {
 } from "@/types/echobridge.types";
 
 export default function DraftPage() {
-  const { currentRole, activeProjectId } = useRole();
+  const { currentRole, activeProjectId, workspaceRevision } = useRole();
 
   const [selectedAudience, setSelectedAudience] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
@@ -61,6 +61,7 @@ export default function DraftPage() {
   }, [currentRole]);
 
   const fetchDraftData = useCallback(async () => {
+    void workspaceRevision;
     try {
       setLoading(true);
       setError(null);
@@ -88,7 +89,7 @@ export default function DraftPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, workspaceRevision]);
 
   useEffect(() => {
     fetchDraftData();

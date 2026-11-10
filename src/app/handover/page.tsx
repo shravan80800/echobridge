@@ -24,7 +24,12 @@ import type {
 } from "@/types/echobridge.types";
 
 export default function HandoverPage() {
-  const { currentRole, activeProjectId, activeProjectName } = useRole();
+  const {
+    currentRole,
+    activeProjectId,
+    activeProjectName,
+    workspaceRevision,
+  } = useRole();
   const [audienceRole, setAudienceRole] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
   );
@@ -74,6 +79,7 @@ export default function HandoverPage() {
       : "Incoming Intern";
 
   const fetchHandoverData = useCallback(async () => {
+    void workspaceRevision;
     try {
       setIsLoading(true);
       const encodedProject = encodeURIComponent(activeProjectId);
@@ -122,7 +128,7 @@ export default function HandoverPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeProjectId, audienceRole]);
+  }, [activeProjectId, workspaceRevision, audienceRole]);
 
   useEffect(() => {
     fetchHandoverData();

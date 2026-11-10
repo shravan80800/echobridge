@@ -73,12 +73,28 @@ const pipelineStages: PipelineStage[] = [
 ];
 
 export default function HomePage() {
-  const { currentRole, switchRole } = useRole();
+  const {
+    currentRole,
+    switchRole,
+    activeProjectId,
+    activeProjectName,
+    resetAllWorkspaces,
+  } = useRole();
   const router = useRouter();
+  const [isResettingDemo, setIsResettingDemo] = React.useState(false);
 
   const handleOpenRole = (role: Role, path: string) => {
     switchRole(role);
     router.push(path);
+  };
+
+  const handleResetDemo = async () => {
+    setIsResettingDemo(true);
+    try {
+      await resetAllWorkspaces();
+    } finally {
+      setIsResettingDemo(false);
+    }
   };
 
   return (
@@ -89,7 +105,11 @@ export default function HomePage() {
       <section className="w-full bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-sm text-center space-y-5">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200 cursor-default select-none">
           <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
-          <span>Project: CampusConnect (Student Club Handover)</span>
+          <span>
+            {activeProjectId === "CampusConnect"
+              ? "Project: CampusConnect (Student Club Handover)"
+              : `Active Workspace: ${activeProjectName} (Live Import)`}
+          </span>
         </div>
 
         <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 leading-tight max-w-3xl mx-auto">
@@ -114,6 +134,24 @@ export default function HomePage() {
           <p className="text-xs text-slate-500">
             Works immediately with any public repo or shared Google Doc — secrets and prompt injections are stripped automatically.
           </p>
+
+          {activeProjectId !== "CampusConnect" && (
+            <div className="mt-2 inline-flex flex-wrap items-center justify-center gap-2.5 px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+              <span>
+                Currently inspecting imported workspace:{" "}
+                <strong>{activeProjectName}</strong>
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleResetDemo}
+                isLoading={isResettingDemo}
+              >
+                🔄 Start Fresh Demo (CampusConnect)
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 

@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/live-import/route";
-import { GET as GET_PROJECTS } from "@/app/api/projects/route";
+import {
+  GET as GET_PROJECTS,
+  DELETE as DELETE_PROJECT,
+} from "@/app/api/projects/route";
 import { GET as GET_GAP_INTERVIEW } from "@/app/api/gap-interview/route";
 import { GET as GET_REVIEW } from "@/app/api/review/route";
 import { GET as GET_HANDOVER } from "@/app/api/handover/route";
@@ -550,6 +553,72 @@ describe("Live URL Importer (GitHub & Public Google Docs)", () => {
       expect(json.projectId).toBe("gdoc-1AbCdEfGhIjK");
       expect(json.projectName).toBe("SRE Runbook Doc");
       expect(json.sourcesIngested).toBe(1);
+    });
+
+    it("deletes a specific custom workspace via DELETE /api/projects without affecting CampusConnect", async () => {
+      repository.resetInMemoryStore(true);
+      vi.stubGlobal("fetch", createGitHubMockFetch());
+
+      await POST(
+        new NextRequest("http://localhost:3000/api/live-import", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "github",
+            url: "https://github.com/shravan80800/echobridge",
+            mode: "new_workspace",
+          }),
+        })
+      );
+
+      expect(await repository.listSources("gh-shravan80800-echobridge")).toHaveLength(4);
+
+      const delRes = await DELETE_PROJECT(
+        new NextRequest(
+          "http://localhost:3000/api/projects?projectId=gh-shravan80800-echobridge",
+          { method: "DELETE" }
+        )
+      );
+      const delJson = await delRes.json();
+
+      expect(delRes.status).toBe(200);
+      expect(delJson.success).toBe(true);
+      expect(delJson.activeProjectId).toBe("CampusConnect");
+      expect(
+        delJson.projects.map((p: { id: string }) => p.id)
+      ).not.toContain("gh-shravan80800-echobridge");
+      expect(await repository.listSources("gh-shravan80800-echobridge")).toHaveLength(0);
+      expect(await repository.listSources("CampusConnect")).toHaveLength(8);
+    });
+
+    it("resets all custom workspaces back to clean CampusConnect baseline via DELETE /api/projects?projectId=all", async () => {
+      repository.resetInMemoryStore(true);
+      vi.stubGlobal("fetch", createGitHubMockFetch());
+
+      await POST(
+        new NextRequest("http://localhost:3000/api/live-import", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "github",
+            url: "https://github.com/shravan80800/echobridge",
+            mode: "new_workspace",
+          }),
+        })
+      );
+
+      const resetRes = await DELETE_PROJECT(
+        new NextRequest("http://localhost:3000/api/projects?projectId=all", {
+          method: "DELETE",
+        })
+      );
+      const resetJson = await resetRes.json();
+
+      expect(resetRes.status).toBe(200);
+      expect(resetJson.success).toBe(true);
+      expect(resetJson.activeProjectId).toBe("CampusConnect");
+      expect(resetJson.projects.map((p: { id: string }) => p.id)).toEqual([
+        "CampusConnect",
+      ]);
+      expect(await repository.listSources("CampusConnect")).toHaveLength(8);
     });
   });
 });

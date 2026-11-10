@@ -56,8 +56,11 @@ export default function ConnectPage() {
   const {
     activeProjectId,
     activeProjectName,
+    workspaceRevision,
     refreshProjects,
     setActiveProject,
+    deleteProject,
+    resetAllWorkspaces,
   } = useRole();
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,6 +99,7 @@ export default function ConnectPage() {
   const fetchIngestionData = useCallback(
     async (overrideProjectId?: string) => {
       const targetId = overrideProjectId || activeProjectId;
+      void workspaceRevision;
       try {
         setLoading(true);
         setError(null);
@@ -121,7 +125,7 @@ export default function ConnectPage() {
         setLoading(false);
       }
     },
-    [activeProjectId]
+    [activeProjectId, workspaceRevision]
   );
 
   useEffect(() => {
@@ -158,29 +162,34 @@ export default function ConnectPage() {
       setError(null);
       setSuccessBanner(null);
 
-      const res = await fetch("/api/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({
-          projectId: "CampusConnect",
-          useSeed: true,
-          reset: true,
-        }),
-      });
-      const json = await res.json();
-      if (!json.success) {
-        throw new Error(json.error || "Failed to reload baseline seed data");
-      }
-
-      setActiveProject("CampusConnect", "CampusConnect");
-      await refreshProjects();
+      await resetAllWorkspaces();
       await fetchIngestionData("CampusConnect");
       setSuccessBanner(
-        "Project sources, drafts, and handover receipts reset cleanly to CampusConnect baseline."
+        "Pipeline, sources, drafts, and receipts reset cleanly to fresh CampusConnect baseline."
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reload seed");
+      setError(err instanceof Error ? err.message : "Failed to reset pipeline");
+    } finally {
+      setIsResettingSeed(false);
+    }
+  };
+
+  const handleDeleteCurrentWorkspace = async () => {
+    if (activeProjectId === "CampusConnect") return;
+    const removedName = activeProjectName;
+    try {
+      setIsResettingSeed(true);
+      setError(null);
+      setSuccessBanner(null);
+      await deleteProject(activeProjectId);
+      await fetchIngestionData("CampusConnect");
+      setSuccessBanner(
+        `Removed workspace "${removedName}" and switched back to CampusConnect Demo.`
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete workspace"
+      );
     } finally {
       setIsResettingSeed(false);
     }
@@ -390,8 +399,9 @@ export default function ConnectPage() {
             variant="secondary"
             onClick={handleReloadSeed}
             isLoading={isResettingSeed}
+            title="Reset all workspaces and restore the fresh CampusConnect baseline"
           >
-            Reload Seed
+            🔄 Reset Pipeline
           </Button>
 
           <Button
@@ -693,6 +703,36 @@ export default function ConnectPage() {
         />
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {activeProjectId !== "CampusConnect" && (
+            <div className="px-4 py-3 bg-amber-50/80 border-b border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="text-xs sm:text-sm font-medium text-amber-950">
+                Viewing imported workspace:{" "}
+                <strong className="font-bold">{activeProjectName}</strong>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setActiveProject("CampusConnect", "CampusConnect")
+                  }
+                >
+                  ← Switch Back to CampusConnect Demo
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteCurrentWorkspace}
+                  isLoading={isResettingSeed}
+                >
+                  🗑️ Delete Workspace
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-700">
               Connected Project Files ({sources.length})

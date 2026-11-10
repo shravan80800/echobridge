@@ -40,6 +40,7 @@ export default function ReviewPage() {
     switchRole,
     activeProjectId,
     activeProjectName,
+    workspaceRevision,
   } = useRole();
   const [audienceRole, setAudienceRole] =
     useState<AudienceRole>("incoming_lead");
@@ -78,6 +79,7 @@ export default function ReviewPage() {
   const isReviewer = currentRole === "reviewer";
 
   const fetchReviewData = useCallback(async () => {
+    void workspaceRevision;
     try {
       setIsLoading(true);
       const encodedProject = encodeURIComponent(activeProjectId);
@@ -133,6 +135,7 @@ export default function ReviewPage() {
     }
   }, [
     activeProjectId,
+    workspaceRevision,
     audienceRole,
     fromVersion,
     toVersion,

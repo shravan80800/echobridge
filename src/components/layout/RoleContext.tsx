@@ -87,8 +87,11 @@ interface RoleContextValue {
   activeProjectId: string;
   activeProjectName: string;
   projects: Project[];
+  workspaceRevision: number;
   refreshProjects: () => Promise<Project[]>;
   setActiveProject: (projectId: string, projectName?: string) => void;
+  deleteProject: (projectId: string) => Promise<void>;
+  resetAllWorkspaces: () => Promise<void>;
 }
 
 const DEFAULT_ROLE_CONTEXT: RoleContextValue = {
@@ -103,11 +106,23 @@ const DEFAULT_ROLE_CONTEXT: RoleContextValue = {
   activeProjectId: "CampusConnect",
   activeProjectName: "CampusConnect",
   projects: [DEFAULT_CAMPUSCONNECT_PROJECT],
+  workspaceRevision: 0,
   refreshProjects: async () => [DEFAULT_CAMPUSCONNECT_PROJECT],
   setActiveProject: () => {},
+  deleteProject: async () => {},
+  resetAllWorkspaces: async () => {},
 };
 
 const RoleContext = createContext<RoleContextValue | undefined>(undefined);
+
+function clearProjectStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_PROJECT_ID_KEY);
+    localStorage.removeItem(STORAGE_PROJECT_NAME_KEY);
+  } catch {
+    // Ignore storage failure
+  }
+}
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [currentRole, setCurrentRole] = useState<Role>("reviewer");
@@ -118,6 +133,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([
     DEFAULT_CAMPUSCONNECT_PROJECT,
   ]);
+  const [workspaceRevision, setWorkspaceRevision] = useState<number>(0);
 
   const refreshProjects = useCallback(async (): Promise<Project[]> => {
     try {
@@ -191,21 +207,74 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     (projectId: string, projectName?: string) => {
       const nextId = projectId?.trim() || "CampusConnect";
       const matched = projects.find((p) => p.id === nextId);
-      const nextName =
-        projectName?.trim() || matched?.name || nextId;
+      const nextName = projectName?.trim() || matched?.name || nextId;
 
       setActiveProjectId(nextId);
       setActiveProjectName(nextName);
 
-      try {
-        localStorage.setItem(STORAGE_PROJECT_ID_KEY, nextId);
-        localStorage.setItem(STORAGE_PROJECT_NAME_KEY, nextName);
-      } catch {
-        // Ignore storage failure
+      if (nextId === "CampusConnect") {
+        clearProjectStorage();
+      } else {
+        try {
+          localStorage.setItem(STORAGE_PROJECT_ID_KEY, nextId);
+          localStorage.setItem(STORAGE_PROJECT_NAME_KEY, nextName);
+        } catch {
+          // Ignore storage failure
+        }
       }
     },
     [projects]
   );
+
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      if (!projectId || projectId === "CampusConnect") return;
+      try {
+        const res = await fetch(
+          `/api/projects?projectId=${encodeURIComponent(projectId)}`,
+          { method: "DELETE", cache: "no-store" }
+        );
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.projects)) {
+          setProjects(json.projects as Project[]);
+        } else {
+          setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        }
+
+        if (activeProjectId === projectId) {
+          clearProjectStorage();
+          setActiveProjectId("CampusConnect");
+          setActiveProjectName("CampusConnect");
+          setWorkspaceRevision((v) => v + 1);
+        }
+      } catch {
+        // Ignore network hiccup
+      }
+    },
+    [activeProjectId]
+  );
+
+  const resetAllWorkspaces = useCallback(async () => {
+    try {
+      const res = await fetch("/api/projects?projectId=all", {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json?.success && Array.isArray(json.projects)) {
+        setProjects(json.projects as Project[]);
+      } else {
+        setProjects([DEFAULT_CAMPUSCONNECT_PROJECT]);
+      }
+    } catch {
+      setProjects([DEFAULT_CAMPUSCONNECT_PROJECT]);
+    } finally {
+      clearProjectStorage();
+      setActiveProjectId("CampusConnect");
+      setActiveProjectName("CampusConnect");
+      setWorkspaceRevision((v) => v + 1);
+    }
+  }, []);
 
   const switchRole = (newRole: Role) => {
     const prevRole = currentRole;
@@ -259,8 +328,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         activeProjectId,
         activeProjectName,
         projects,
+        workspaceRevision,
         refreshProjects,
         setActiveProject,
+        deleteProject,
+        resetAllWorkspaces,
       }}
     >
       {children}

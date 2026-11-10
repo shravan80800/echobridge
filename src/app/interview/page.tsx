@@ -11,7 +11,12 @@ import { GapQuestionCard } from "@/components/interview/GapQuestionCard";
 import type { GapQuestion } from "@/types/echobridge.types";
 
 export default function GapInterviewPage() {
-  const { currentRole, activeProjectId, activeProjectName } = useRole();
+  const {
+    currentRole,
+    activeProjectId,
+    activeProjectName,
+    workspaceRevision,
+  } = useRole();
   const [questions, setQuestions] = useState<GapQuestion[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +26,7 @@ export default function GapInterviewPage() {
   const departingName = "Aarav Sharma";
 
   const fetchInterviewData = useCallback(async () => {
+    void workspaceRevision;
     try {
       setIsLoading(true);
       const res = await fetch(
@@ -48,7 +54,7 @@ export default function GapInterviewPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, workspaceRevision]);
 
   useEffect(() => {
     fetchInterviewData();
