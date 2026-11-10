@@ -17,6 +17,7 @@ import {
   getReceipt,
   ComprehensionQuizFailedError,
 } from "@/services/workflow/receipt.service";
+import { ensureCustomDraftVersionsInitialized } from "@/services/workflow/review.service";
 import type { AudienceRole } from "@/types/echobridge.types";
 
 export async function GET(request: NextRequest) {
@@ -25,7 +26,12 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get("projectId") || "CampusConnect";
     const roleParam = (searchParams.get("role") || "incoming_lead") as AudienceRole;
 
-    const [questions, receipt] = await Promise.all([
+    if (projectId !== "CampusConnect") {
+      await ensureCustomDraftVersionsInitialized(projectId, [roleParam]);
+    }
+
+    const [project, questions, receipt] = await Promise.all([
+      repository.getProject(projectId),
       getComprehensionQuestions(projectId, roleParam),
       getReceipt(projectId, roleParam),
     ]);
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       projectId,
+      projectName: project?.name || projectId,
       audienceRole: roleParam,
       hasAcknowledged: !!receipt,
       receipt,

@@ -260,6 +260,43 @@ export function parseGoogleDocUrl(rawUrl: string): { docId: string } {
   return { docId: match[1] };
 }
 
+export interface WorkspaceMetadata {
+  projectId: string;
+  projectName: string;
+  description: string;
+}
+
+export function resolveGitHubWorkspaceMeta(
+  url: string,
+  titleOverride?: string
+): WorkspaceMetadata {
+  const { owner, repo } = parseGitHubRepoUrl(url);
+  const projectId = `gh-${owner}-${repo}`
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-");
+  const projectName = titleOverride?.trim() || `${owner}/${repo}`;
+  return {
+    projectId,
+    projectName,
+    description: `Imported from GitHub (https://github.com/${owner}/${repo})`,
+  };
+}
+
+export function resolveGoogleDocWorkspaceMeta(
+  url: string,
+  titleOverride?: string
+): WorkspaceMetadata {
+  const { docId } = parseGoogleDocUrl(url);
+  const projectId = `gdoc-${docId.slice(0, 12)}`;
+  const projectName =
+    titleOverride?.trim() || `Google Doc (${docId.slice(0, 8)})`;
+  return {
+    projectId,
+    projectName,
+    description: `Imported from Google Docs (https://docs.google.com/document/d/${docId})`,
+  };
+}
+
 interface GitHubCommitItem {
   sha?: string;
   commit?: {

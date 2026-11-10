@@ -1,19 +1,24 @@
 /**
- * Live URL Importer API Route Handler (Phase 1)
+ * Live URL Importer API Route Handler
  * Supports public & PAT-authenticated GitHub repositories and public Google Docs
- * with zero OAuth setup. Runs fetched content through Secret Redaction,
- * Prompt-Injection Guard, and Handover Draft Reconstruction.
+ * with zero OAuth setup. Supports both creating isolated project workspaces
+ * (`mode: "new_workspace"`) and appending into an existing workspace (`projectId`).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { repository } from "@/lib/supabase/repository";
 import { ingestSources, type RawSourceInput } from "@/services/ingestion/parser.service";
 import { reconstructAllAudienceDrafts } from "@/services/trust/generator.service";
+import { getOrGenerateGapQuestions } from "@/services/workflow/interview.service";
+import { ensureCustomDraftVersionsInitialized } from "@/services/workflow/review.service";
 import {
   checkLiveImportRateLimit,
   extractClientRateLimitKey,
   fetchGitHubSources,
   fetchGoogleDocSource,
   LiveImportError,
+  resolveGitHubWorkspaceMeta,
+  resolveGoogleDocWorkspaceMeta,
   stripSecretToken,
 } from "@/services/ingestion/live-import.service";
 
@@ -23,7 +28,9 @@ interface LiveImportRequestBody {
   type?: "github" | "google_doc";
   url?: string;
   token?: string;
+  mode?: "new_workspace" | "append";
   projectId?: string;
+  title?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -58,10 +65,9 @@ export async function POST(request: NextRequest) {
     const importType = body.type;
     const url = typeof body.url === "string" ? body.url.trim() : "";
     rawToken = typeof body.token === "string" ? body.token.trim() : undefined;
-    const projectId =
-      typeof body.projectId === "string" && body.projectId.trim()
-        ? body.projectId.trim()
-        : "CampusConnect";
+    const mode = body.mode === "new_workspace" ? "new_workspace" : "append";
+    const titleOverride =
+      typeof body.title === "string" ? body.title.trim() : undefined;
 
     if (importType !== "github" && importType !== "google_doc") {
       return NextResponse.json(
@@ -77,6 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 1. Fetch upstream live content first so invalid/private failures leave zero broken workspaces
     let sources: RawSourceInput[] = [];
     if (importType === "github") {
       const result = await fetchGitHubSources(url, rawToken);
@@ -86,16 +93,69 @@ export async function POST(request: NextRequest) {
       sources = [docSource];
     }
 
-    const summary = await ingestSources(sources, projectId);
-    await reconstructAllAudienceDrafts(projectId);
+    // 2. Resolve target workspace & register Project when creating or using a custom workspace
+    let targetProjectId =
+      typeof body.projectId === "string" && body.projectId.trim()
+        ? body.projectId.trim()
+        : "CampusConnect";
+    let targetProjectName = targetProjectId;
+
+    if (mode === "new_workspace") {
+      const meta =
+        importType === "github"
+          ? resolveGitHubWorkspaceMeta(url, titleOverride)
+          : resolveGoogleDocWorkspaceMeta(url, titleOverride);
+      targetProjectId = meta.projectId;
+      targetProjectName = meta.projectName;
+
+      await repository.createOrUpdateProject({
+        id: meta.projectId,
+        name: meta.projectName,
+        description: meta.description,
+        freshness_threshold_days: 180,
+        created_at: new Date().toISOString(),
+      });
+    } else if (targetProjectId !== "CampusConnect") {
+      const existing = await repository.getProject(targetProjectId);
+      if (!existing) {
+        targetProjectName = titleOverride || targetProjectId;
+        await repository.createOrUpdateProject({
+          id: targetProjectId,
+          name: targetProjectName,
+          description: "Custom EchoBridge Handover Workspace",
+          freshness_threshold_days: 180,
+          created_at: new Date().toISOString(),
+        });
+      } else {
+        targetProjectName = existing.name;
+      }
+    } else {
+      const existing = await repository.getProject("CampusConnect");
+      targetProjectName = existing?.name || "CampusConnect";
+    }
+
+    // 3. Ingest, redact, verify & reconstruct drafts
+    const summary = await ingestSources(sources, targetProjectId);
+    await reconstructAllAudienceDrafts(targetProjectId);
+
+    // 4. For custom isolated workspaces, initialize v1.1/v2.0 snapshots and dynamic Gap-Interview questions
+    if (targetProjectId !== "CampusConnect") {
+      await ensureCustomDraftVersionsInitialized(targetProjectId);
+      await getOrGenerateGapQuestions(targetProjectId, "incoming_lead");
+    }
+
+    const projectRecord = await repository.getProject(targetProjectId);
+    const resolvedProjectName = projectRecord?.name || targetProjectName;
 
     return NextResponse.json({
       success: true,
+      projectId: targetProjectId,
+      projectName: resolvedProjectName,
       sourcesIngested: summary.sourcesIngested,
       chunksCreated: summary.chunksCreated,
       quarantinedSecretsCount: summary.quarantinedSecretsCount,
       injectionsFlaggedCount: summary.injectionsFlaggedCount,
-      message: "Live content ingested and draft updated.",
+      message: `Live content ingested into "${resolvedProjectName}" and handover drafts updated.`,
     });
   } catch (error) {
     if (error instanceof LiveImportError) {

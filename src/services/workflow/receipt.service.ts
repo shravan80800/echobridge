@@ -19,6 +19,7 @@ import type {
 import { repository } from "@/lib/supabase/repository";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { CAMPUS_CONNECT_COMPREHENSION_QUESTIONS } from "@/services/seed/campus-connect.seed";
+import { buildDraftVersionId, getProjectTag } from "@/utils/project-scope";
 
 export interface QuizEvaluationResult {
   totalQuestions: number;
@@ -55,8 +56,77 @@ export async function getComprehensionQuestions(
   projectId = "CampusConnect",
   audienceRole: AudienceRole = "incoming_lead"
 ): Promise<ComprehensionQuestion[]> {
-  // Return pre-configured benchmark risk questions
-  return CAMPUS_CONNECT_COMPREHENSION_QUESTIONS;
+  if (!projectId || projectId === "CampusConnect") {
+    return CAMPUS_CONNECT_COMPREHENSION_QUESTIONS;
+  }
+
+  const [project, sources, v20, v11, v10] = await Promise.all([
+    repository.getProject(projectId),
+    repository.listSources(projectId),
+    repository.getDraftVersion(projectId, audienceRole, "v2.0"),
+    repository.getDraftVersion(projectId, audienceRole, "v1.1"),
+    repository.getDraftVersion(projectId, audienceRole, "v1.0"),
+  ]);
+
+  const draft = v20 || v11 || v10;
+  const claims = draft?.claims || [];
+  if (sources.length === 0 && claims.length === 0) {
+    return CAMPUS_CONNECT_COMPREHENSION_QUESTIONS;
+  }
+
+  const projectName = project?.name || projectId;
+  const tag = getProjectTag(projectId);
+  const primarySource = sources[0];
+  const secondarySource = sources[1] || primarySource;
+  const primaryClaim = claims[0];
+  const claimSnippet = primaryClaim?.text
+    ? primaryClaim.text.length > 110
+      ? `${primaryClaim.text.slice(0, 107).trimEnd()}...`
+      : primaryClaim.text
+    : `Verified source artifacts from ${primarySource?.title || projectName} were indexed with verbatim citation tracking.`;
+
+  return [
+    {
+      id: `${tag}QUIZ-01`,
+      question: `Which primary imported source establishes the project context for ${projectName}?`,
+      options: [
+        primarySource
+          ? `${primarySource.title} (Author: ${primarySource.author})`
+          : `${projectName} verified project repository sources`,
+        "Unverified personal scratchpad outside the repository",
+        "Legacy hardcoded demo template unrelated to this project",
+      ],
+      correct_option_index: 0,
+      explanation: `EchoBridge indexed ${sources.length} source${
+        sources.length === 1 ? "" : "s"
+      } for ${projectName}, anchored by "${primarySource?.title || projectName}".`,
+      related_risk_claim_id: primaryClaim?.id,
+    },
+    {
+      id: `${tag}QUIZ-02`,
+      question: `How does EchoBridge safeguard secrets and unsafe prompt instructions discovered inside ${projectName} sources?`,
+      options: [
+        "Leaves raw tokens inside the draft so incoming owners can copy them",
+        "Quarantines detected secrets/tokens pre-embedding and strips prompt injections before synthesis",
+        "Deletes the entire repository instead of redacting sensitive lines",
+      ],
+      correct_option_index: 1,
+      explanation: `Every chunk from ${projectName} passed through secret redaction and prompt-injection stripping before handover generation.`,
+      related_risk_claim_id: claims[1]?.id || primaryClaim?.id,
+    },
+    {
+      id: `${tag}QUIZ-03`,
+      question: `Which verified claim or continuity fact was extracted from ${secondarySource?.title || projectName}?`,
+      options: [
+        claimSnippet,
+        `${projectName} requires zero documentation review or handover verification`,
+        "All pending operational risks and dependencies are automatically marked resolved without review",
+      ],
+      correct_option_index: 0,
+      explanation: `This claim is grounded in ${secondarySource?.title || projectName} and verified via verbatim span citation.`,
+      related_risk_claim_id: primaryClaim?.id,
+    },
+  ];
 }
 
 /**
@@ -195,7 +265,8 @@ export async function acknowledgeReceipt(params: {
     (await repository.getDraftVersion(projectId, audienceRole, "v1.1")) ||
     (await repository.getDraftVersion(projectId, audienceRole, "v1.0"));
 
-  const draftId = draft?.id || `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`;
+  const draftId =
+    draft?.id || buildDraftVersionId(projectId, audienceRole, "v2.0");
   const timestamp = new Date().toISOString();
 
   // 3. Compute digital cryptographic receipt hash & full 64-char SHA-256 verification key

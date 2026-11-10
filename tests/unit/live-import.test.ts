@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/live-import/route";
+import { GET as GET_PROJECTS } from "@/app/api/projects/route";
+import { GET as GET_GAP_INTERVIEW } from "@/app/api/gap-interview/route";
+import { GET as GET_REVIEW } from "@/app/api/review/route";
+import { GET as GET_HANDOVER } from "@/app/api/handover/route";
+import { POST as POST_RECEIPT } from "@/app/api/receipt/route";
 import {
   parseGitHubRepoUrl,
   parseGoogleDocUrl,
@@ -411,6 +416,140 @@ describe("Live URL Importer (GitHub & Public Google Docs)", () => {
       });
       const otherIpRes = await POST(otherIpReq);
       expect(otherIpRes.status).toBe(400);
+    });
+  });
+
+  describe("Multi-Project Isolated Workspaces (MULTI-PROJECT-PHASE-1)", () => {
+    it("creates an isolated GitHub workspace, populates projects list, gap questions, v1.1/v2.0 drafts, and repo-derived quiz", async () => {
+      repository.resetInMemoryStore(true);
+      vi.stubGlobal("fetch", createGitHubMockFetch());
+
+      const importReq = new NextRequest("http://localhost:3000/api/live-import", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "github",
+          url: "https://github.com/shravan80800/echobridge",
+          mode: "new_workspace",
+        }),
+      });
+
+      const importRes = await POST(importReq);
+      const importJson = await importRes.json();
+
+      expect(importRes.status).toBe(200);
+      expect(importJson.success).toBe(true);
+      expect(importJson.projectId).toBe("gh-shravan80800-echobridge");
+      expect(importJson.projectName).toBe("shravan80800/echobridge");
+
+      // 1. Projects listing includes both CampusConnect and new workspace without overwriting CampusConnect
+      const projectsRes = await GET_PROJECTS();
+      const projectsJson = await projectsRes.json();
+      expect(projectsRes.status).toBe(200);
+      const ids = projectsJson.projects.map((p: { id: string }) => p.id);
+      expect(ids).toContain("CampusConnect");
+      expect(ids).toContain("gh-shravan80800-echobridge");
+
+      const ccSources = await repository.listSources("CampusConnect");
+      const ghSources = await repository.listSources("gh-shravan80800-echobridge");
+      expect(ccSources).toHaveLength(8);
+      expect(ghSources).toHaveLength(4);
+
+      // 2. Dynamic Gap-Interview questions exist and reference the GitHub workspace
+      const gapRes = await GET_GAP_INTERVIEW(
+        new NextRequest(
+          "http://localhost:3000/api/gap-interview?projectId=gh-shravan80800-echobridge&role=incoming_lead"
+        )
+      );
+      const gapJson = await gapRes.json();
+      expect(gapRes.status).toBe(200);
+      expect(gapJson.questions).toHaveLength(3);
+      expect(
+        gapJson.questions.every((q: { project_id: string }) => q.project_id === "gh-shravan80800-echobridge")
+      ).toBe(true);
+
+      // 3. Review route has v1.0, v1.1, and v2.0 drafts populated automatically
+      const reviewRes = await GET_REVIEW(
+        new NextRequest(
+          "http://localhost:3000/api/review?projectId=gh-shravan80800-echobridge&role=incoming_lead&fromVersion=v1.0&toVersion=v2.0"
+        )
+      );
+      const reviewJson = await reviewRes.json();
+      expect(reviewRes.status).toBe(200);
+      expect(reviewJson.drafts.map((d: { version_label: string }) => d.version_label)).toEqual([
+        "v1.0",
+        "v1.1",
+        "v2.0",
+      ]);
+      expect(reviewJson.activeDraft.claims.length).toBeGreaterThanOrEqual(1);
+
+      // 4. Handover route returns dynamic projectName + 3 project-specific quiz items and acknowledges receipt
+      const handoverRes = await GET_HANDOVER(
+        new NextRequest(
+          "http://localhost:3000/api/handover?projectId=gh-shravan80800-echobridge&role=incoming_lead"
+        )
+      );
+      const handoverJson = await handoverRes.json();
+      expect(handoverRes.status).toBe(200);
+      expect(handoverJson.projectName).toBe("shravan80800/echobridge");
+      expect(handoverJson.questions).toHaveLength(3);
+      expect(handoverJson.questions[0].question).toContain("shravan80800/echobridge");
+
+      const ackRes = await POST_RECEIPT(
+        new NextRequest("http://localhost:3000/api/receipt", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "acknowledge",
+            projectId: "gh-shravan80800-echobridge",
+            audienceRole: "incoming_lead",
+            incomingUserName: "Riya Patel",
+            answers: handoverJson.questions.map(
+              (q: { id: string; correct_option_index: number }) => ({
+                question_id: q.id,
+                selected_index: q.correct_option_index,
+              })
+            ),
+          }),
+        })
+      );
+      const ackJson = await ackRes.json();
+      expect(ackRes.status).toBe(200);
+      expect(ackJson.success).toBe(true);
+      expect(ackJson.receipt.project_id).toBe("gh-shravan80800-echobridge");
+      expect(ackJson.receipt.comprehension_score).toBe(100);
+    });
+
+    it("creates an isolated Google Doc workspace with gdoc- prefix and custom title", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string | URL | Request) => {
+          const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+          if (url.startsWith("https://docs.google.com/document/d/")) {
+            return new Response(
+              "Incident Runbook: PostgreSQL failover runs via primary replica promote.",
+              { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } }
+            );
+          }
+          return new Response("Offline test mock", { status: 503 });
+        })
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/live-import", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "google_doc",
+          url: "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQr/edit",
+          mode: "new_workspace",
+          title: "SRE Runbook Doc",
+        }),
+      });
+
+      const res = await POST(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.projectId).toBe("gdoc-1AbCdEfGhIjK");
+      expect(json.projectName).toBe("SRE Runbook Doc");
+      expect(json.sourcesIngested).toBe(1);
     });
   });
 });

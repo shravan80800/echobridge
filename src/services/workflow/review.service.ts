@@ -22,6 +22,7 @@ import { repository } from "@/lib/supabase/repository";
 import { computeConfidenceBreakdown } from "@/services/trust/confidence.service";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { getCampusConnectSeedData } from "@/services/seed/campus-connect.seed";
+import { buildDraftVersionId } from "@/utils/project-scope";
 
 export interface ClaimDiffItem {
   claimId: string;
@@ -597,7 +598,7 @@ export async function approveHandover(params: {
     }
   }
 
-  const targetV2Id = `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`;
+  const targetV2Id = buildDraftVersionId(projectId, audienceRole, "v2.0");
   for (const c of v2Claims) {
     const baseId = stripClaimVersionSuffix(c.id);
     c.id = `${baseId}-V2.0`;
@@ -628,7 +629,7 @@ export async function approveHandover(params: {
 
   // 4. Construct DraftVersion v2.0
   const draftV2_0: DraftVersion = {
-    id: `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`,
+    id: targetV2Id,
     project_id: projectId,
     audience_role: audienceRole,
     version_label: "v2.0",
@@ -664,6 +665,74 @@ export async function approveHandover(params: {
   };
 }
 
+function buildClonedDraftVersion(
+  sourceDraft: DraftVersion,
+  projectId: string,
+  targetRole: AudienceRole,
+  targetVersion: "v1.1" | "v2.0"
+): DraftVersion {
+  const targetDraftId = buildDraftVersionId(projectId, targetRole, targetVersion);
+  const idSuffix = targetVersion === "v1.1" ? "-V1.1" : "-V2.0";
+  const clonedClaims: ClaimRecord[] = JSON.parse(
+    JSON.stringify(sourceDraft.claims || [])
+  ).map((c: ClaimRecord) => ({
+    ...c,
+    id: `${stripClaimVersionSuffix(c.id)}${idSuffix}`,
+    draft_version_id: targetDraftId,
+    project_id: projectId,
+    audience_role: targetRole,
+  }));
+
+  return {
+    id: targetDraftId,
+    project_id: projectId,
+    audience_role: targetRole,
+    version_label: targetVersion,
+    confidence: computeConfidenceBreakdown(clonedClaims),
+    status: "draft",
+    claims: clonedClaims,
+    created_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * For custom (non-CampusConnect) projects that only have v1.0 generated so far,
+ * automatically initializes v1.1 and v2.0 snapshots from v1.0 so /review and
+ * /handover always load populated claims instead of empty states.
+ */
+export async function ensureCustomDraftVersionsInitialized(
+  projectId: string,
+  roles: AudienceRole[] = ["incoming_lead", "incoming_intern"]
+): Promise<void> {
+  if (!projectId || projectId === "CampusConnect") return;
+
+  for (const role of roles) {
+    const [v1_0, existingV1_1, existingV2_0] = await Promise.all([
+      repository.getDraftVersion(projectId, role, "v1.0"),
+      repository.getDraftVersion(projectId, role, "v1.1"),
+      repository.getDraftVersion(projectId, role, "v2.0"),
+    ]);
+
+    if (!v1_0) continue;
+
+    let v1_1 = existingV1_1;
+    if (!v1_1) {
+      v1_1 = buildClonedDraftVersion(v1_0, projectId, role, "v1.1");
+      await repository.saveDraftVersion(v1_1);
+    }
+
+    if (!existingV2_0) {
+      const v2_0 = buildClonedDraftVersion(
+        v1_1 || v1_0,
+        projectId,
+        role,
+        "v2.0"
+      );
+      await repository.saveDraftVersion(v2_0);
+    }
+  }
+}
+
 /**
  * Retrieves the full review workspace state (all draft versions, diffs, conflicts).
  */
@@ -685,6 +754,8 @@ export async function getReviewDashboardData(params: {
     fromVersion = "v1.0",
     toVersion = "v1.1",
   } = params;
+
+  await ensureCustomDraftVersionsInitialized(projectId, [audienceRole]);
 
   // Retrieve all versions for this audience
   const v1_0 = await repository.getDraftVersion(projectId, audienceRole, "v1.0");

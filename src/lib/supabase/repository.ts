@@ -611,29 +611,55 @@ export class EchoBridgeRepository {
         await this.ensureProjectSeeded("CampusConnect");
         const client = getSupabaseServerClient();
         if (client) {
-          const { data, error } = await client.from("projects").select("*");
-          if (!error && data) return data as Project[];
+          const { data, error } = await client
+            .from("projects")
+            .select("*")
+            .order("created_at", { ascending: true });
+          if (!error && data) {
+            for (const p of data as Project[]) {
+              this.projects.set(p.id, p);
+            }
+          }
         }
       } catch (err) {
         console.warn("[Supabase] listProjects fallback:", err);
       }
     }
-    return Array.from(this.projects.values());
+
+    const projects = Array.from(this.projects.values());
+    projects.sort((a, b) => {
+      if (a.id === "CampusConnect") return -1;
+      if (b.id === "CampusConnect") return 1;
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+    return projects;
   }
 
-  public async createProject(project: Project): Promise<Project> {
+  public async createOrUpdateProject(project: Project): Promise<Project> {
     this.projects.set(project.id, project);
     if (this.isConfigured()) {
       try {
         const client = getSupabaseServerClient();
         if (client) {
-          await client.from("projects").upsert(project, { onConflict: "id" });
+          const { error } = await client
+            .from("projects")
+            .upsert(project, { onConflict: "id" });
+          if (error) {
+            console.warn(
+              "[Supabase] createOrUpdateProject warning:",
+              error.message
+            );
+          }
         }
       } catch (err) {
-        console.warn("[Supabase] createProject warning:", err);
+        console.warn("[Supabase] createOrUpdateProject warning:", err);
       }
     }
     return project;
+  }
+
+  public async createProject(project: Project): Promise<Project> {
+    return this.createOrUpdateProject(project);
   }
 
   // ==========================================================================
@@ -1245,16 +1271,62 @@ export class EchoBridgeRepository {
     );
   }
 
-  public async answerGapQuestion(
-    questionId: string,
-    answerText: string,
-    answeredBy: string
-  ): Promise<GapQuestion | null> {
-    if (this.isConfigured()) {
-      await this.listGapQuestions("CampusConnect");
+  public async saveGapQuestions(
+    questions: GapQuestion[]
+  ): Promise<GapQuestion[]> {
+    for (const q of questions) {
+      this.gapQuestions.set(q.id, q);
     }
 
+    if (this.isConfigured() && questions.length > 0) {
+      try {
+        const client = getSupabaseServerClient();
+        if (client) {
+          await this.ensureProjectRecord(client, questions[0].project_id);
+          const { error } = await client
+            .from("gap_questions")
+            .upsert(questions, { onConflict: "id" });
+          if (error) {
+            console.warn(
+              "[Supabase] saveGapQuestions warning:",
+              error.message
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("[Supabase] saveGapQuestions fallback:", err);
+      }
+    }
+
+    return questions;
+  }
+
+  private async findGapQuestionById(
+    questionId: string
+  ): Promise<GapQuestion | undefined> {
     let question = this.gapQuestions.get(questionId);
+    if (!question && this.isConfigured()) {
+      try {
+        const client = getSupabaseServerClient();
+        if (client) {
+          const { data } = await client
+            .from("gap_questions")
+            .select("*")
+            .eq("id", questionId)
+            .maybeSingle();
+          if (data) {
+            question = data as GapQuestion;
+            this.gapQuestions.set(question.id, question);
+          }
+        }
+      } catch (err) {
+        console.warn("[Supabase] findGapQuestionById fallback:", err);
+      }
+      if (!question) {
+        await this.listGapQuestions("CampusConnect");
+      }
+    }
+
     if (!question) {
       question = Array.from(this.gapQuestions.values()).find(
         (q) =>
@@ -1266,6 +1338,16 @@ export class EchoBridgeRepository {
           (questionId === "GAP-Q-03" && q.id === "GAP-003")
       );
     }
+
+    return question;
+  }
+
+  public async answerGapQuestion(
+    questionId: string,
+    answerText: string,
+    answeredBy: string
+  ): Promise<GapQuestion | null> {
+    const question = await this.findGapQuestionById(questionId);
     if (!question) return null;
 
     question.answer_text = answerText;
@@ -1317,22 +1399,7 @@ export class EchoBridgeRepository {
     questionId: string,
     assignedContact: string
   ): Promise<GapQuestion | null> {
-    if (this.isConfigured()) {
-      await this.listGapQuestions("CampusConnect");
-    }
-
-    let question = this.gapQuestions.get(questionId);
-    if (!question) {
-      question = Array.from(this.gapQuestions.values()).find(
-        (q) =>
-          q.id === questionId ||
-          (questionId === "GAP-Q-01" &&
-            (q.id === "GAP-TRAP-2" || q.planted_trap_id === 2)) ||
-          (questionId === "GAP-Q-02" &&
-            (q.id === "GAP-TRAP-7" || q.planted_trap_id === 7)) ||
-          (questionId === "GAP-Q-03" && q.id === "GAP-003")
-      );
-    }
+    const question = await this.findGapQuestionById(questionId);
     if (!question) return null;
 
     question.assigned_contact_if_unanswered = assignedContact;

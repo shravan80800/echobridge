@@ -34,6 +34,10 @@ import { isClaimStale } from "@/utils/date-freshness";
 import { computeConfidenceBreakdown } from "@/services/trust/confidence.service";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { getCampusConnectSeedData } from "@/services/seed/campus-connect.seed";
+import {
+  buildDraftVersionId,
+  buildScopedClaimId,
+} from "@/utils/project-scope";
 
 const VALID_SECTIONS: ReadonlySet<HandoverSection> = new Set([
   "architecture",
@@ -147,7 +151,6 @@ function normalizeGeminiClaims(params: {
   draftVersionId: string;
 }): ClaimRecord[] {
   const { rawItems, chunksById, sourcesById, targetRole, projectId, draftVersionId } = params;
-  const roleTag = targetRole === "incoming_lead" ? "LEAD" : "INT";
   const normalized: ClaimRecord[] = [];
   const seenIds = new Set<string>();
 
@@ -211,10 +214,19 @@ function normalizeGeminiClaims(params: {
       if (audienceAcl.length === 0) audienceAcl = [targetRole];
     }
 
-    const candidateId =
-      typeof rec.id === "string" && rec.id.trim().length > 0 && !seenIds.has(rec.id.trim())
-        ? rec.id.trim()
-        : `CLM-GEN-${roleTag}-${i + 1}`;
+    const rawSuffix =
+      typeof rec.id === "string" && rec.id.trim().length > 0
+        ? rec.id.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 18)
+        : String(i + 1);
+    const baseCandidate = buildScopedClaimId(
+      "CLM-GEN",
+      projectId,
+      targetRole,
+      rawSuffix || String(i + 1)
+    );
+    const candidateId = !seenIds.has(baseCandidate)
+      ? baseCandidate
+      : buildScopedClaimId("CLM-GEN", projectId, targetRole, `${i + 1}`);
     seenIds.add(candidateId);
 
     const evidenceState: EvidenceState = VALID_EVIDENCE_STATES.has(rawState as EvidenceState)
@@ -260,7 +272,6 @@ export function synthesizeCustomChunkClaims(params: {
     projectId,
     draftVersionId,
   } = params;
-  const roleTag = targetRole === "incoming_lead" ? "LEAD" : "INT";
   const synthesized: ClaimRecord[] = [];
 
   for (const chunk of chunks) {
@@ -279,7 +290,7 @@ export function synthesizeCustomChunkClaims(params: {
     const displayText = claimText.length >= 20 ? claimText : `${sourceTitle}: ${claimText}`;
 
     synthesized.push({
-      id: `CLM-CUSTOM-${roleTag}-${chunk.id}`,
+      id: buildScopedClaimId("CLM-CUSTOM", projectId, targetRole, chunk.id),
       draft_version_id: draftVersionId,
       project_id: projectId,
       audience_role: targetRole,
@@ -348,7 +359,7 @@ export async function reconstructDraftForAudience(params: {
 
   // 2. Retrieve-Only Generation:
   // Synthesize atomic claims from permitted chunks (using Gemini if configured, or deterministic benchmark seed)
-  const draftVersionId = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.0`;
+  const draftVersionId = buildDraftVersionId(projectId, targetRole, "v1.0");
   const allSources = await repository.listSources(projectId);
   const sourcesById = new Map<string, Source>(allSources.map((s) => [s.id, s]));
   const customPermittedChunks = permittedChunks.filter(

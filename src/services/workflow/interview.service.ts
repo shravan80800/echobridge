@@ -18,6 +18,8 @@ import { repository } from "@/lib/supabase/repository";
 import { computeConfidenceBreakdown } from "@/services/trust/confidence.service";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { getCampusConnectSeedData } from "@/services/seed/campus-connect.seed";
+import { getGeminiClient } from "@/lib/gemini/client";
+import { buildDraftVersionId, buildScopedGapId } from "@/utils/project-scope";
 
 export interface GapInterviewProgress {
   totalQuestions: number;
@@ -72,14 +74,162 @@ function matchesGapQuestionClaim(
   }
   const baseClaimId = stripVersionSuffix(c.id);
   const baseTargetId = stripVersionSuffix(question.claim_id);
+  const roleNeutralClaimId = baseClaimId.replace(/-LEAD-|-INT-/g, "-ROLE-");
+  const roleNeutralTargetId = baseTargetId.replace(/-LEAD-|-INT-/g, "-ROLE-");
   return (
     c.id === question.claim_id ||
     baseClaimId === baseTargetId ||
+    roleNeutralClaimId === roleNeutralTargetId ||
     baseClaimId === `${baseTargetId}-INTERN` ||
     c.id.startsWith(`${question.claim_id}-`) ||
     (question.planted_trap_id === 2 && c.text.toLowerCase().includes("redis")) ||
     (question.planted_trap_id === 7 && c.text.toLowerCase().includes("domain"))
   );
+}
+
+/**
+ * Generates 3 repo/doc-specific Gap-Interview questions when a custom project
+ * workspace has no pre-existing gap questions.
+ */
+export async function synthesizeDynamicGapQuestions(
+  projectId: string
+): Promise<GapQuestion[]> {
+  const [project, sources, v10Lead] = await Promise.all([
+    repository.getProject(projectId),
+    repository.listSources(projectId),
+    repository.getDraftVersion(projectId, "incoming_lead", "v1.0"),
+  ]);
+
+  const projectName = project?.name || projectId;
+  const claims = v10Lead?.claims || [];
+  if (sources.length === 0 && claims.length === 0) {
+    return [];
+  }
+
+  const readmeSource =
+    sources.find(
+      (s) => s.title.startsWith("README:") || s.title.startsWith("Google Doc:")
+    ) || sources[0];
+  const issuesSource = sources.find(
+    (s) =>
+      s.title.startsWith("Open Issues:") ||
+      s.title.startsWith("Open Pull Requests:")
+  );
+  const commitsSource = sources.find((s) =>
+    s.title.startsWith("Recent Commits:")
+  );
+
+  const pickClaimForSource = (
+    preferredSourceId?: string,
+    fallbackIndex = 0
+  ): ClaimRecord | undefined => {
+    if (preferredSourceId) {
+      const fromSrc = claims.find((c) =>
+        (c.evidence || []).some((e) => e.source_id === preferredSourceId)
+      );
+      if (fromSrc) return fromSrc;
+    }
+    return claims[fallbackIndex] || claims[0];
+  };
+
+  const claim1 = pickClaimForSource(readmeSource?.id, 0);
+  const claim2 = pickClaimForSource(issuesSource?.id, 1);
+  const claim3 = pickClaimForSource(commitsSource?.id, 2);
+
+  let questionTexts = [
+    {
+      question_text: `Why was the core architecture and stack in ${readmeSource?.title || projectName} chosen, and what design trade-offs should the incoming owner preserve?`,
+      context_summary:
+        claim1?.text ||
+        `Derived from ${readmeSource?.title || projectName} — architectural rationale is undocumented in source files.`,
+    },
+    {
+      question_text: issuesSource
+        ? `Which items tracked in ${issuesSource.title} are highest priority for week-one continuity in ${projectName}, and who owns follow-up decisions?`
+        : `Which unresolved tasks, edge cases, or stakeholder sign-offs in ${projectName} need immediate week-one attention?`,
+      context_summary:
+        claim2?.text ||
+        `Derived from ${issuesSource?.title || projectName} — ownership & priority rationale needs confirmation.`,
+    },
+    {
+      question_text: `Where are runtime secrets, deployment credentials, and rollback checks managed for ${projectName}, and are there unwritten operational steps?`,
+      context_summary:
+        claim3?.text ||
+        `Derived from ${commitsSource?.title || projectName} — operational deployment & secret handover verification.`,
+    },
+  ];
+
+  // Optional Gemini refinement when configured (keeps deterministic structure on failure/offline)
+  const gemini = getGeminiClient();
+  if (gemini && claims.length > 0) {
+    try {
+      const summaryContext = claims
+        .slice(0, 6)
+        .map((c, idx) => `${idx + 1}. [${c.section}] ${c.text}`)
+        .join("\n");
+      const prompt = `You are EchoBridge's Gap-Interview Designer for project "${projectName}".
+Based on these extracted claims from the repository/document:
+${summaryContext}
+
+Generate exactly 3 concise tacit-knowledge handover questions asking what is NOT written in the docs:
+1) Architecture & design trade-off rationale
+2) Open issues / PR priorities & stakeholder ownership
+3) Deployment credentials, environment variables & rollback runbook
+
+Return JSON: { "questions": [{ "question_text": "...", "context_summary": "..." }] } (exact 3 items).`;
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: { temperature: 0, responseMimeType: "application/json" },
+      });
+      const parsed = JSON.parse(response.text?.trim() || "{}");
+      if (Array.isArray(parsed.questions) && parsed.questions.length === 3) {
+        const refined = parsed.questions
+          .map((q: unknown) => {
+            if (!q || typeof q !== "object") return null;
+            const rec = q as Record<string, unknown>;
+            const qt =
+              typeof rec.question_text === "string"
+                ? rec.question_text.trim()
+                : "";
+            const cs =
+              typeof rec.context_summary === "string"
+                ? rec.context_summary.trim()
+                : "";
+            return qt && cs ? { question_text: qt, context_summary: cs } : null;
+          })
+          .filter(
+            (x: { question_text: string; context_summary: string } | null): x is {
+              question_text: string;
+              context_summary: string;
+            } => x !== null
+          );
+        if (refined.length === 3) {
+          questionTexts = refined;
+        }
+      }
+    } catch {
+      // Fall back to deterministic grounded repo/doc questions above
+    }
+  }
+
+  const linkedClaims = [claim1, claim2, claim3];
+  const generated: GapQuestion[] = questionTexts.map((qt, idx) => ({
+    id: buildScopedGapId(projectId, idx + 1),
+    project_id: projectId,
+    claim_id:
+      linkedClaims[idx]?.id ||
+      claims[0]?.id ||
+      `CLM-CUSTOM-${projectId.toUpperCase().slice(0, 12)}-GAP-${idx + 1}`,
+    question_text: qt.question_text,
+    context_summary: qt.context_summary,
+    assigned_contact_if_unanswered: "Repository Maintainer / Project Mentor",
+    status: "pending",
+  }));
+
+  await repository.saveGapQuestions(generated);
+  return generated;
 }
 
 /**
@@ -89,9 +239,14 @@ export async function getOrGenerateGapQuestions(
   projectId = "CampusConnect",
   audienceRole: AudienceRole = "incoming_lead"
 ): Promise<GapQuestion[]> {
+  void audienceRole;
   const existing = await repository.listGapQuestions(projectId);
   if (existing.length > 0) {
     return existing;
+  }
+
+  if (projectId !== "CampusConnect") {
+    return synthesizeDynamicGapQuestions(projectId);
   }
 
   // Load from synthetic CampusConnect benchmark seed
@@ -101,10 +256,7 @@ export async function getOrGenerateGapQuestions(
   );
 
   // If repository has none, populate seed questions
-  for (const q of seedQuestions) {
-    // In-memory set
-    (repository as any).gapQuestions?.set(q.id, q);
-  }
+  await repository.saveGapQuestions(seedQuestions);
 
   return seedQuestions;
 }
@@ -167,7 +319,7 @@ export async function submitGapAnswer(params: {
       (await repository.getDraftVersion(projectId, targetRole, "v1.0"));
     if (!baseDraft) return null;
 
-    const draftV11Id = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`;
+    const draftV11Id = buildDraftVersionId(projectId, targetRole, "v1.1");
     let claimsCopy: ClaimRecord[] = JSON.parse(JSON.stringify(baseDraft.claims));
     claimsCopy = await mergeNewCustomClaimsFromV10(
       projectId,
@@ -316,7 +468,7 @@ export async function simulateSuddenExit(params: {
       (await repository.getDraftVersion(projectId, targetRole, "v1.0"));
     if (!baseDraft) return null;
 
-    const draftV11Id = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`;
+    const draftV11Id = buildDraftVersionId(projectId, targetRole, "v1.1");
     let claimsCopy: ClaimRecord[] = JSON.parse(JSON.stringify(baseDraft.claims));
     claimsCopy = await mergeNewCustomClaimsFromV10(
       projectId,
