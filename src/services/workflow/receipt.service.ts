@@ -135,6 +135,30 @@ export function computeReceiptHash(params: {
 }
 
 /**
+ * Computes the full 64-character SHA-256 verification key for display/certificate verification.
+ */
+export function computeVerificationKey(params: {
+  projectId: string;
+  draftVersionId: string;
+  audienceRole: AudienceRole;
+  incomingUserName: string;
+  timestamp: string;
+  score: number;
+}): string {
+  const payload = [
+    params.projectId,
+    params.draftVersionId,
+    params.audienceRole,
+    params.incomingUserName,
+    params.timestamp,
+    params.score.toString(),
+  ].join("::");
+
+  const digest = crypto.createHash("sha256").update(payload).digest("hex");
+  return `sha256:${digest}`;
+}
+
+/**
  * Acknowledges handover receipt and issues digital verification certificate.
  * Strictly verifies that the recipient passed the risk comprehension quiz first.
  */
@@ -174,19 +198,22 @@ export async function acknowledgeReceipt(params: {
   const draftId = draft?.id || `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`;
   const timestamp = new Date().toISOString();
 
-  // 3. Compute digital cryptographic receipt hash
-  const receiptHash = computeReceiptHash({
+  // 3. Compute digital cryptographic receipt hash & full 64-char SHA-256 verification key
+  const sigParams = {
     projectId,
     draftVersionId: draftId,
     audienceRole,
     incomingUserName,
     timestamp,
     score: evaluation.scorePercentage,
-  });
+  };
+  const receiptHash = computeReceiptHash(sigParams);
+  const verificationKey = computeVerificationKey(sigParams);
 
-  // 4. Construct and save Receipt
+  // 4. Construct and save single canonical Receipt per (project_id, audience_role)
+  const projectSlug = projectId.toUpperCase().replace(/[^A-Z0-9]+/g, "-") || "PROJECT";
   const receipt: Receipt = {
-    id: `RCP-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-${Date.now()}`,
+    id: `RCP-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-${projectSlug}`,
     project_id: projectId,
     draft_version_id: draftId,
     audience_role: audienceRole,
@@ -196,6 +223,7 @@ export async function acknowledgeReceipt(params: {
     answers: evaluation.answers,
     acknowledged_at: timestamp,
     receipt_hash: receiptHash,
+    verification_key: verificationKey,
   };
 
   await repository.saveReceipt(receipt);

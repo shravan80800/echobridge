@@ -1,1 +1,1 @@
-export { GET, POST } from "@/app/api/receipt/route";
+export { dynamic, GET, POST } from "@/app/api/receipt/route";

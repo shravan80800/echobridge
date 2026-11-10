@@ -67,21 +67,50 @@ export function OnboardingBoard({
         "Deploy hackathon registration portal for March 20th deadline (approved by Mentor).",
       ];
 
-  const renderTaskCard = (key: string, label: string, claim?: ClaimRecord) => (
-    <div
-      key={key}
-      className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm flex items-start justify-between gap-2.5"
-    >
-      <p className="text-sm text-slate-800 font-medium leading-snug">{label}</p>
+  const renderProofButton = (
+    onClick: () => void,
+    ariaLabel: string,
+    fallbackColorClass = "hover:bg-slate-100 border-slate-200"
+  ) =>
+    cleanMode ? (
       <button
         type="button"
-        onClick={() => onInspectSource?.(label, claim)}
-        className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs cursor-pointer transition-colors"
+        onClick={onClick}
+        className="inline-flex items-center gap-1 bg-teal-50 hover:bg-teal-600 text-teal-800 hover:text-white border border-teal-200 hover:border-teal-600 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer shadow-sm"
         title="View cited project source"
-        aria-label={`View source for ${label}`}
+        aria-label={ariaLabel}
+      >
+        <span>📄 View Source Proof ↗</span>
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-white border text-xs cursor-pointer transition-colors ${fallbackColorClass}`}
+        title="View cited project source"
+        aria-label={ariaLabel}
       >
         🔗
       </button>
+    );
+
+  const renderTaskCard = (key: string, label: string, claim?: ClaimRecord) => (
+    <div
+      key={key}
+      className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm ${
+        cleanMode
+          ? "flex flex-col gap-2.5"
+          : "flex items-start justify-between gap-2.5"
+      }`}
+    >
+      <p className="text-sm text-slate-800 font-medium leading-snug">{label}</p>
+      <div className={cleanMode ? "flex justify-end" : "shrink-0"}>
+        {renderProofButton(
+          () => onInspectSource?.(label, claim),
+          `View source for ${label}`,
+          "bg-slate-50 hover:bg-slate-100 border-slate-200"
+        )}
+      </div>
     </div>
   );
 
@@ -162,51 +191,57 @@ export function OnboardingBoard({
 
         <div className="space-y-2.5">
           {/* Open Risk Card (Figure 7) */}
-          <div className="bg-rose-50 border border-rose-200 rounded-lg p-3.5 text-rose-950 space-y-1.5">
+          <div className="bg-rose-50 border border-rose-200 rounded-lg p-3.5 text-rose-950 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <span className="text-sm font-bold text-rose-950 leading-snug">
                 🚩 Open risk: API rate limits &amp; DB connection pool
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  onInspectSource?.("API rate limits & DB connection pool")
-                }
-                className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-white hover:bg-rose-100 border border-rose-200 text-xs cursor-pointer transition-colors"
-                title="View cited project source"
-                aria-label="View source for Open risk"
-              >
-                🔗
-              </button>
+              {!cleanMode &&
+                renderProofButton(
+                  () => onInspectSource?.("API rate limits & DB connection pool"),
+                  "View source for Open risk",
+                  "hover:bg-rose-100 border-rose-200"
+                )}
             </div>
             <p className="text-xs text-rose-900 leading-relaxed">
               PostgreSQL connection limits hit under heavy traffic; active sessions rely on Redis caching.
             </p>
+            {cleanMode && (
+              <div className="flex justify-end pt-0.5">
+                {renderProofButton(
+                  () => onInspectSource?.("API rate limits & DB connection pool"),
+                  "View source for Open risk"
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stale Runbook Warning Card */}
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3.5 text-orange-950 space-y-1.5">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3.5 text-orange-950 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <span className="text-xs sm:text-sm font-semibold text-orange-950 leading-snug">
                 {cleanMode
                   ? "⚠️ Outdated Runbook: Worker restart script (9 months old)"
                   : "Deployment Runbook > 180 Days Old"}
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  onInspectSource?.("Outdated Worker restart script")
-                }
-                className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-white hover:bg-orange-100 border border-orange-200 text-xs cursor-pointer transition-colors"
-                title="View cited runbook"
-                aria-label="View source for Outdated Runbook"
-              >
-                🔗
-              </button>
+              {!cleanMode &&
+                renderProofButton(
+                  () => onInspectSource?.("Outdated Worker restart script"),
+                  "View source for Outdated Runbook",
+                  "hover:bg-orange-100 border-orange-200"
+                )}
             </div>
             <p className="text-xs text-orange-900 leading-relaxed">
               Verify Docker worker settings before restarting background jobs.
             </p>
+            {cleanMode && (
+              <div className="flex justify-end pt-0.5">
+                {renderProofButton(
+                  () => onInspectSource?.("Outdated Worker restart script"),
+                  "View source for Outdated Runbook"
+                )}
+              </div>
+            )}
           </div>
 
           {/* Restricted Placeholder Card (ONLY in Intern View) */}

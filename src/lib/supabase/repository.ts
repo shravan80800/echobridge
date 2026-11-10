@@ -295,6 +295,7 @@ export class EchoBridgeRepository {
       answers_json: {
         answers: receipt.answers || [],
         receipt_hash: receipt.receipt_hash || "",
+        verification_key: receipt.verification_key || "",
       },
       acknowledged_at: receipt.acknowledged_at || new Date().toISOString(),
     };
@@ -304,6 +305,7 @@ export class EchoBridgeRepository {
     const rawAnswersJson = row.answers_json;
     let answers: ReceiptAnswer[] = [];
     let receiptHash = "";
+    let verificationKey = "";
 
     if (Array.isArray(rawAnswersJson)) {
       answers = rawAnswersJson as ReceiptAnswer[];
@@ -311,9 +313,12 @@ export class EchoBridgeRepository {
       const obj = rawAnswersJson as {
         answers?: ReceiptAnswer[];
         receipt_hash?: string;
+        verification_key?: string;
       };
       answers = Array.isArray(obj.answers) ? obj.answers : [];
       receiptHash = typeof obj.receipt_hash === "string" ? obj.receipt_hash : "";
+      verificationKey =
+        typeof obj.verification_key === "string" ? obj.verification_key : "";
     }
 
     const acknowledgedAt = String(
@@ -321,17 +326,21 @@ export class EchoBridgeRepository {
     );
     const score = Number(row.comprehension_score || 0);
 
+    const payload = [
+      String(row.project_id),
+      String(row.draft_version_id),
+      String(row.audience_role),
+      String(row.incoming_user_name),
+      acknowledgedAt,
+      String(score),
+    ].join("::");
+    const digest = crypto.createHash("sha256").update(payload).digest("hex");
+
     if (!receiptHash) {
-      const payload = [
-        String(row.project_id),
-        String(row.draft_version_id),
-        String(row.audience_role),
-        String(row.incoming_user_name),
-        acknowledgedAt,
-        String(score),
-      ].join("::");
-      const digest = crypto.createHash("sha256").update(payload).digest("hex");
       receiptHash = `0x${digest.slice(0, 40)}`;
+    }
+    if (!verificationKey) {
+      verificationKey = `sha256:${digest}`;
     }
 
     return {
@@ -345,6 +354,7 @@ export class EchoBridgeRepository {
       answers,
       acknowledged_at: acknowledgedAt,
       receipt_hash: receiptHash,
+      verification_key: verificationKey,
     };
   }
 
@@ -1395,6 +1405,16 @@ export class EchoBridgeRepository {
   }
 
   public async saveReceipt(receipt: Receipt): Promise<Receipt> {
+    // Enforce single canonical receipt per (project_id, audience_role) in memory
+    for (const [existingId, existing] of this.receipts.entries()) {
+      if (
+        existing.project_id === receipt.project_id &&
+        existing.audience_role === receipt.audience_role &&
+        existingId !== receipt.id
+      ) {
+        this.receipts.delete(existingId);
+      }
+    }
     this.receipts.set(receipt.id, receipt);
 
     if (this.isConfigured()) {
@@ -1437,6 +1457,14 @@ export class EchoBridgeRepository {
 
           if (error) {
             console.warn("[Supabase] saveReceipt warning:", error.message);
+          } else {
+            // Remove any stale duplicate rows for the same (project_id, audience_role)
+            await client
+              .from("receipts")
+              .delete()
+              .eq("project_id", receipt.project_id)
+              .eq("audience_role", receipt.audience_role)
+              .neq("id", receipt.id);
           }
         }
       } catch (err) {

@@ -390,6 +390,7 @@ export default function DraftPage() {
                         key={claim.id}
                         claim={claim}
                         chunksById={chunksMap}
+                        cleanMode
                         onInspectEvidence={handleOpenCitation}
                       />
                     ))}

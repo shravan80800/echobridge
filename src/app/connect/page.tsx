@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { StepGuideBanner } from "@/components/ui/StepGuideBanner";
 import { LoadingSkeleton, ErrorBanner } from "@/components/ui/StateViews";
 import { RedactionQuarantineTable } from "@/components/review/RedactionQuarantineTable";
 import type {
@@ -229,6 +230,10 @@ export default function ConnectPage() {
 
   return (
     <main className="w-full space-y-6">
+      <StepGuideBanner stepLabel="STEP 1 OF 4 • CONNECT SOURCES">
+        EchoBridge scanned 8 project files and automatically hid 2 secrets. Review the file access permissions below, then click <strong>Generate Handover Draft →</strong>
+      </StepGuideBanner>
+
       {/* ==================================================================== */}
       {/* 1. ALIGNED PAGE HEADER                                               */}
       {/* ==================================================================== */}

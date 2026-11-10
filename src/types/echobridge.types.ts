@@ -353,6 +353,7 @@ export interface Receipt {
   answers?: ReceiptAnswer[];
   acknowledged_at: string;
   receipt_hash?: string;
+  verification_key?: string;
 }
 
 // ============================================================================

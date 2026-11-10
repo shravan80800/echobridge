@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, RotateCcw } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
 import { Button } from "@/components/ui/Button";
+import { StepGuideBanner } from "@/components/ui/StepGuideBanner";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { GapQuestionCard } from "@/components/interview/GapQuestionCard";
 import type { GapQuestion } from "@/types/echobridge.types";
@@ -161,6 +162,10 @@ export default function GapInterviewPage() {
 
   return (
     <main className="max-w-2xl mx-auto w-full space-y-5">
+      <StepGuideBanner stepLabel="STEP 2 OF 4 • GAP INTERVIEW">
+        EchoBridge detected 3 unwritten decisions missing from your docs. Answer them below so your successor isn&apos;t left guessing, then click <strong>Continue to Review &amp; Approval →</strong>
+      </StepGuideBanner>
+
       {/* ==================================================================== */}
       {/* 1. CLEAN HEADER                                                      */}
       {/* ==================================================================== */}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ShieldAlert, XCircle, Sparkles, Send } from "lucide-react";
 import type { ComprehensionQuestion } from "@/types/echobridge.types";
 import { Modal } from "@/components/ui/Modal";
@@ -32,6 +32,14 @@ export function ComprehensionQuizModal({
     Record<string, number>
   >({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMessage(null);
+      submittingRef.current = false;
+    }
+  }, [isOpen]);
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
     setSelectedAnswers((prev) => ({
@@ -51,6 +59,7 @@ export function ComprehensionQuizModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || submittingRef.current) return;
     setErrorMessage(null);
 
     const answersArray = questions.map((q) => ({
@@ -66,6 +75,7 @@ export function ComprehensionQuizModal({
       return;
     }
 
+    submittingRef.current = true;
     try {
       await onAcknowledge(answersArray);
       onClose();
@@ -75,6 +85,8 @@ export function ComprehensionQuizModal({
           ? err.message
           : "Please double-check your answers on critical project risks.";
       setErrorMessage(msg);
+    } finally {
+      submittingRef.current = false;
     }
   };
 

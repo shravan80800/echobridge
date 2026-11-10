@@ -19,6 +19,7 @@ import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
 import { ClaimCard } from "@/components/evidence/ClaimCard";
 import { SourceCitationPopover } from "@/components/evidence/SourceCitationPopover";
 import { Button } from "@/components/ui/Button";
+import { StepGuideBanner } from "@/components/ui/StepGuideBanner";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { ConflictResolutionCard } from "@/components/review/ConflictResolutionCard";
 import type {
@@ -387,6 +388,10 @@ export default function ReviewPage() {
 
   return (
     <main className="w-full space-y-5">
+      <StepGuideBanner stepLabel="STEP 3 OF 4 • REVIEW & APPROVE">
+        Click any <strong>View Source Proof</strong> button to inspect the exact quote, resolve the Purple date conflict, and click <strong>Approve &amp; Publish Handover →</strong>
+      </StepGuideBanner>
+
       {/* ==================================================================== */}
       {/* 1. DEPARTING MEMBER / NON-REVIEWER POLITE NOTICE BAR                 */}
       {/* ==================================================================== */}
@@ -586,6 +591,7 @@ export default function ReviewPage() {
                             key={claim.id}
                             claim={claim}
                             chunksById={chunksMap}
+                            cleanMode
                             onInspectEvidence={(evidence, chunk, claimText) => {
                               setInspectedEvidence(evidence);
                               setInspectedChunk(chunk || null);

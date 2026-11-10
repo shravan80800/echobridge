@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { CheckCircle2, FileText, GitBranch } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
+import { StepGuideBanner } from "@/components/ui/StepGuideBanner";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { ReceiptBanner } from "@/components/handover/ReceiptBanner";
 import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
@@ -45,6 +46,7 @@ export default function HandoverPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [isResettingReceipt, setIsResettingReceipt] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
@@ -116,6 +118,8 @@ export default function HandoverPage() {
   const handleAcknowledge = async (
     answers: { question_id: string; selected_index: number }[]
   ) => {
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
     try {
       setIsSubmitting(true);
       setFeedbackMessage(null);
@@ -147,6 +151,7 @@ export default function HandoverPage() {
         );
       }
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -291,6 +296,10 @@ export default function HandoverPage() {
 
   return (
     <main className="w-full space-y-6">
+      <StepGuideBanner stepLabel="STEP 4 OF 4 • FINAL HANDOVER & RECEIPT">
+        Compare <strong>Team Lead (Riya)</strong> vs. <strong>Intern (Kabir)</strong> views to see how confidential Finance data is protected, then click <strong>Acknowledge</strong> to generate your signed receipt.
+      </StepGuideBanner>
+
       {/* ==================================================================== */}
       {/* TOP-RIGHT SIMPLE AUDIENCE TOGGLE ROW                                 */}
       {/* ==================================================================== */}
@@ -458,6 +467,7 @@ export default function HandoverPage() {
                           key={claim.id}
                           claim={claim}
                           chunksById={chunksMap}
+                          cleanMode
                           onInspectEvidence={(evidence, chunk, claimText) => {
                             setInspectedEvidence(evidence);
                             setInspectedChunk(chunk || null);

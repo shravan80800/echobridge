@@ -8,7 +8,7 @@ import type {
   EvidenceState,
 } from "@/types/echobridge.types";
 import { EvidenceBadge } from "@/components/evidence/EvidenceBadge";
-import { Lock, FileQuestion } from "lucide-react";
+import { Lock, FileQuestion, FileText, ArrowUpRight } from "lucide-react";
 
 interface ClaimCardProps {
   claim: ClaimRecord;
@@ -18,7 +18,36 @@ interface ClaimCardProps {
     chunk?: Chunk,
     claimText?: string
   ) => void;
+  cleanMode?: boolean;
   className?: string;
+}
+
+const SHORT_SOURCE_LABELS: Array<[RegExp, string]> = [
+  [/architecture/i, "Arch Doc v2"],
+  [/git|pr_?12/i, "PR #12"],
+  [/chat/i, "Team Chat"],
+  [/planning/i, "Planning Doc"],
+  [/runbook/i, "Runbook"],
+  [/finance|budget|sponsor/i, "Finance Folder"],
+  [/backlog/i, "Backlog"],
+  [/task_?board|sprint/i, "Task Board"],
+];
+
+function formatShortProofLabel(evidence: EvidenceRecord[]): string {
+  if (evidence.length > 1) {
+    return `View Proof (${evidence.length} Sources)`;
+  }
+  const rawTitle = evidence[0]?.source_title || evidence[0]?.source_id || "Source";
+  const matched = SHORT_SOURCE_LABELS.find(([re]) => re.test(rawTitle));
+  if (matched) {
+    return `View Proof · ${matched[1]}`;
+  }
+  const cleaned = rawTitle
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  const short = cleaned.length > 20 ? `${cleaned.slice(0, 18).trimEnd()}…` : cleaned;
+  return `View Proof · ${short || "Source"}`;
 }
 
 const rowSurfaceColors: Record<EvidenceState, string> = {
@@ -35,6 +64,7 @@ export function ClaimCard({
   claim,
   chunksById,
   onInspectEvidence,
+  cleanMode = false,
   className = "",
 }: ClaimCardProps) {
   const getChunk = (id: string): Chunk | undefined => {
@@ -132,25 +162,42 @@ export function ClaimCard({
         </div>
 
         {/* Right Side: Non-Clickable EvidenceBadge + Clickable source button */}
-        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
           <EvidenceBadge state={claim.evidence_state} size="sm" />
 
           {primaryEvidence ? (
-            <button
-              type="button"
-              onClick={() =>
-                onInspectEvidence?.(primaryEvidence, primaryChunk, claim.text)
-              }
-              className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-md px-2.5 py-1 text-xs font-semibold shadow-sm cursor-pointer transition-colors"
-              title="View quoted source evidence"
-            >
-              <span>🔗 source</span>
-              {claim.evidence && claim.evidence.length > 1 && (
-                <span className="text-[11px] text-slate-500 font-normal">
-                  +{claim.evidence.length - 1}
-                </span>
-              )}
-            </button>
+            cleanMode ? (
+              <button
+                type="button"
+                data-testid="claim-source-btn"
+                onClick={() =>
+                  onInspectEvidence?.(primaryEvidence, primaryChunk, claim.text)
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 hover:bg-teal-600 text-teal-800 hover:text-white border border-teal-300 hover:border-teal-600 shadow-sm hover:shadow transition-all cursor-pointer group"
+                title="View verbatim source proof"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span>{formatShortProofLabel(claim.evidence)}</span>
+                <ArrowUpRight className="w-3.5 h-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-testid="claim-source-btn"
+                onClick={() =>
+                  onInspectEvidence?.(primaryEvidence, primaryChunk, claim.text)
+                }
+                className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-md px-2.5 py-1 text-xs font-semibold shadow-sm cursor-pointer transition-colors"
+                title="View quoted source evidence"
+              >
+                <span>🔗 source</span>
+                {claim.evidence && claim.evidence.length > 1 && (
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    +{claim.evidence.length - 1}
+                  </span>
+                )}
+              </button>
+            )
           ) : (
             <span className="text-xs text-slate-500 px-2 py-0.5 rounded-full bg-white/70 border border-slate-200 cursor-default select-none">
               No source
