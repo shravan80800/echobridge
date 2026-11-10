@@ -29,6 +29,59 @@ export interface GapInterviewProgress {
   draftVersionV1_1?: DraftVersion | null;
 }
 
+function stripVersionSuffix(claimId: string): string {
+  return claimId.replace(/-V1\.[012]|-V2\.0/g, "");
+}
+
+async function mergeNewCustomClaimsFromV10(
+  projectId: string,
+  role: AudienceRole,
+  claims: ClaimRecord[],
+  targetDraftVersionId: string
+): Promise<ClaimRecord[]> {
+  const v10 = await repository.getDraftVersion(projectId, role, "v1.0");
+  if (!v10) return claims;
+
+  const existingBaseIds = new Set(claims.map((c) => stripVersionSuffix(c.id)));
+  const extras = v10.claims.filter((c) => {
+    const isCustom =
+      c.id.startsWith("CLM-CUSTOM-") ||
+      c.id.startsWith("CLM-GEN-") ||
+      (c.evidence || []).some((e) => !e.source_id.startsWith("SRC-"));
+    return isCustom && !existingBaseIds.has(stripVersionSuffix(c.id));
+  });
+
+  if (extras.length === 0) return claims;
+  return [
+    ...claims,
+    ...extras.map((c) => ({
+      ...c,
+      id: `${stripVersionSuffix(c.id)}-V1.1`,
+      draft_version_id: targetDraftVersionId,
+    })),
+  ];
+}
+
+function matchesGapQuestionClaim(
+  c: ClaimRecord,
+  question: GapQuestion,
+  targetRole: AudienceRole
+): boolean {
+  if (targetRole === "incoming_intern" && !c.audience_acl.includes("incoming_intern")) {
+    return false;
+  }
+  const baseClaimId = stripVersionSuffix(c.id);
+  const baseTargetId = stripVersionSuffix(question.claim_id);
+  return (
+    c.id === question.claim_id ||
+    baseClaimId === baseTargetId ||
+    baseClaimId === `${baseTargetId}-INTERN` ||
+    c.id.startsWith(`${question.claim_id}-`) ||
+    (question.planted_trap_id === 2 && c.text.toLowerCase().includes("redis")) ||
+    (question.planted_trap_id === 7 && c.text.toLowerCase().includes("domain"))
+  );
+}
+
 /**
  * Retrieves or generates the targeted gap questions for a project.
  */
@@ -105,53 +158,98 @@ export async function submitGapAnswer(params: {
     throw new Error(`Gap question ${questionId} not found`);
   }
 
-  // 2. Fetch latest v1.0 claims to promote into v1.1
-  const baseDraft =
-    (await repository.getDraftVersion(projectId, audienceRole, "v1.1")) ||
-    (await repository.getDraftVersion(projectId, audienceRole, "v1.0"));
+  // 2. Fetch latest v1.1 or v1.0 claims to promote into v1.1 across target role + sibling audience
+  const applyAnswerForRole = async (
+    targetRole: AudienceRole
+  ): Promise<{ draft: DraftVersion; matched: ClaimRecord | null } | null> => {
+    const baseDraft =
+      (await repository.getDraftVersion(projectId, targetRole, "v1.1")) ||
+      (await repository.getDraftVersion(projectId, targetRole, "v1.0"));
+    if (!baseDraft) return null;
 
-  if (!baseDraft) {
+    const draftV11Id = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`;
+    let claimsCopy: ClaimRecord[] = JSON.parse(JSON.stringify(baseDraft.claims));
+    claimsCopy = await mergeNewCustomClaimsFromV10(
+      projectId,
+      targetRole,
+      claimsCopy,
+      draftV11Id
+    );
+
+    let matched: ClaimRecord | null = null;
+    for (let i = 0; i < claimsCopy.length; i++) {
+      const c = claimsCopy[i];
+      if (matchesGapQuestionClaim(c, question, targetRole)) {
+        c.evidence_state = "attested"; // Transition Red -> Blue Attested!
+        c.text = `${c.text.replace(/\s*\[Attested(?:\s+by)?[^\]]*\]/gi, "").trim()} [Attested by ${answeredBy}: "${answerText}"]`;
+        matched = c;
+        break;
+      }
+    }
+
+    const normalizedV11Claims = claimsCopy.map((c) => ({
+      ...c,
+      id: c.id.endsWith("-V1.1") ? c.id : `${stripVersionSuffix(c.id)}-V1.1`,
+      draft_version_id: draftV11Id,
+    }));
+    const updatedConf = computeConfidenceBreakdown(normalizedV11Claims);
+    const savedV11: DraftVersion = {
+      id: draftV11Id,
+      project_id: projectId,
+      audience_role: targetRole,
+      version_label: "v1.1",
+      confidence: updatedConf,
+      status: "gap_interview_complete",
+      claims: normalizedV11Claims,
+      created_at: new Date().toISOString(),
+    };
+    await repository.saveDraftVersion(savedV11);
+
+    // If v2.0 already exists in storage, keep its matching claim synchronized too
+    if (matched) {
+      const existingV20 = await repository.getDraftVersion(
+        projectId,
+        targetRole,
+        "v2.0"
+      );
+      if (existingV20) {
+        const v20Claims: ClaimRecord[] = JSON.parse(
+          JSON.stringify(existingV20.claims)
+        );
+        let touched = false;
+        for (const c20 of v20Claims) {
+          if (matchesGapQuestionClaim(c20, question, targetRole)) {
+            c20.evidence_state = "attested";
+            c20.text = matched.text;
+            touched = true;
+            break;
+          }
+        }
+        if (touched) {
+          await repository.saveDraftVersion({
+            ...existingV20,
+            claims: v20Claims,
+            confidence: computeConfidenceBreakdown(v20Claims),
+          });
+        }
+      }
+    }
+
+    return { draft: savedV11, matched };
+  };
+
+  const primaryResult = await applyAnswerForRole(audienceRole);
+  if (!primaryResult) {
     throw new Error(`No draft version found for ${projectId} / ${audienceRole}`);
   }
 
-  // Clone claims
-  const claimsCopy: ClaimRecord[] = JSON.parse(
-    JSON.stringify(baseDraft.claims)
-  );
+  const siblingRole: AudienceRole =
+    audienceRole === "incoming_lead" ? "incoming_intern" : "incoming_lead";
+  await applyAnswerForRole(siblingRole);
 
-  // Find and update the corresponding claim to Attested (Blue)
-  let updatedClaim: ClaimRecord | null = null;
-
-  for (let i = 0; i < claimsCopy.length; i++) {
-    const c = claimsCopy[i];
-    if (
-      c.id === question.claim_id ||
-      (question.planted_trap_id === 2 && c.text.toLowerCase().includes("redis")) ||
-      (question.planted_trap_id === 7 && c.text.toLowerCase().includes("domain"))
-    ) {
-      c.evidence_state = "attested"; // Transition Red -> Blue Attested!
-      c.text = `${c.text.replace(/\s*\[Attested:.*?\]/g, "")} [Attested by ${answeredBy}: "${answerText}"]`;
-      updatedClaim = c;
-      break;
-    }
-  }
-
-  // 3. Recalculate transparent 4-part confidence score for v1.1
-  const updatedConfidence = computeConfidenceBreakdown(claimsCopy);
-
-  // 4. Construct and Save DraftVersion v1.1
-  const draftV1_1: DraftVersion = {
-    id: `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`,
-    project_id: projectId,
-    audience_role: audienceRole,
-    version_label: "v1.1",
-    confidence: updatedConfidence,
-    status: "gap_interview_complete",
-    claims: claimsCopy,
-    created_at: new Date().toISOString(),
-  };
-
-  await repository.saveDraftVersion(draftV1_1);
+  const updatedClaim = primaryResult.matched;
+  const draftV1_1 = primaryResult.draft;
+  const updatedConfidence = draftV1_1.confidence;
 
   // 5. Emit immutable audit event
   await logAuditEvent({
@@ -210,40 +308,59 @@ export async function simulateSuddenExit(params: {
     }
   }
 
-  // Fetch v1.0 draft
-  const baseDraft =
-    (await repository.getDraftVersion(projectId, audienceRole, "v1.1")) ||
-    (await repository.getDraftVersion(projectId, audienceRole, "v1.0"));
+  const applySuddenExitForRole = async (
+    targetRole: AudienceRole
+  ): Promise<DraftVersion | null> => {
+    const baseDraft =
+      (await repository.getDraftVersion(projectId, targetRole, "v1.1")) ||
+      (await repository.getDraftVersion(projectId, targetRole, "v1.0"));
+    if (!baseDraft) return null;
 
-  if (!baseDraft) {
+    const draftV11Id = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`;
+    let claimsCopy: ClaimRecord[] = JSON.parse(JSON.stringify(baseDraft.claims));
+    claimsCopy = await mergeNewCustomClaimsFromV10(
+      projectId,
+      targetRole,
+      claimsCopy,
+      draftV11Id
+    );
+
+    const normalizedClaims = claimsCopy.map((c) => {
+      const nextText =
+        c.evidence_state === "unsupported"
+          ? `${c.text.replace(/\s*\[Fallback Contact:.*?\]/g, "").trim()} [Fallback Contact: ${assignedFallbackContact}]`
+          : c.text;
+      return {
+        ...c,
+        id: c.id.endsWith("-V1.1") ? c.id : `${stripVersionSuffix(c.id)}-V1.1`,
+        draft_version_id: draftV11Id,
+        text: nextText,
+      };
+    });
+
+    const conf = computeConfidenceBreakdown(normalizedClaims);
+    const savedDraft: DraftVersion = {
+      id: draftV11Id,
+      project_id: projectId,
+      audience_role: targetRole,
+      version_label: "v1.1",
+      confidence: conf,
+      status: "gap_interview_complete",
+      claims: normalizedClaims,
+      created_at: new Date().toISOString(),
+    };
+    await repository.saveDraftVersion(savedDraft);
+    return savedDraft;
+  };
+
+  const draftV1_1 = await applySuddenExitForRole(audienceRole);
+  if (!draftV1_1) {
     throw new Error(`No draft version found for ${projectId} / ${audienceRole}`);
   }
 
-  // Clone claims and annotate unanswered red gaps with fallback contact
-  const claimsCopy: ClaimRecord[] = JSON.parse(
-    JSON.stringify(baseDraft.claims)
-  );
-
-  for (const c of claimsCopy) {
-    if (c.evidence_state === "unsupported") {
-      c.text = `${c.text.replace(/\s*\[Fallback Contact:.*?\]/g, "")} [Fallback Contact: ${assignedFallbackContact}]`;
-    }
-  }
-
-  const confidence = computeConfidenceBreakdown(claimsCopy);
-
-  const draftV1_1: DraftVersion = {
-    id: `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v1.1`,
-    project_id: projectId,
-    audience_role: audienceRole,
-    version_label: "v1.1",
-    confidence,
-    status: "gap_interview_complete",
-    claims: claimsCopy,
-    created_at: new Date().toISOString(),
-  };
-
-  await repository.saveDraftVersion(draftV1_1);
+  const siblingRole: AudienceRole =
+    audienceRole === "incoming_lead" ? "incoming_intern" : "incoming_lead";
+  await applySuddenExitForRole(siblingRole);
 
   // Log audit event
   await logAuditEvent({

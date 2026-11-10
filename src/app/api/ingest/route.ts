@@ -8,6 +8,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { repository } from "@/lib/supabase/repository";
+import { reconstructAllAudienceDrafts } from "@/services/trust/generator.service";
+
+export const dynamic = "force-dynamic";
 import {
   ingestCampusConnectSeed,
   ingestSources,
@@ -82,14 +85,33 @@ export async function POST(request: NextRequest) {
     const projectId = body.projectId || "CampusConnect";
 
     if (body.reset) {
-      repository.resetInMemoryStore(false);
+      await repository.resetProjectStore(projectId);
+      if (!body.sources || body.sources.length === 0) {
+        const [sources, chunks, secrets] = await Promise.all([
+          repository.listSources(projectId),
+          repository.listChunks(projectId),
+          repository.listSecrets(projectId),
+        ]);
+        return NextResponse.json({
+          success: true,
+          message: `Project ${projectId} reset cleanly to initial CampusConnect baseline (${sources.length} sources, ${chunks.length} chunks).`,
+          data: {
+            projectId,
+            sourcesIngested: sources.length,
+            chunksCreated: chunks.length,
+            secretsQuarantined: secrets.length,
+            reset: true,
+          },
+        });
+      }
     }
 
     if (body.sources && Array.isArray(body.sources) && body.sources.length > 0) {
       const summary = await ingestSources(body.sources, projectId);
+      await reconstructAllAudienceDrafts(projectId);
       return NextResponse.json({
         success: true,
-        message: `Successfully ingested ${summary.sourcesIngested} sources and created ${summary.chunksCreated} chunks.`,
+        message: `Successfully ingested ${summary.sourcesIngested} sources, created ${summary.chunksCreated} chunks, and updated handover drafts.`,
         data: summary,
       });
     }

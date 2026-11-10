@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuditTrail, logAuditEvent } from "@/services/workflow/audit.service";
 import type { AuditEventType, Role } from "@/types/echobridge.types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

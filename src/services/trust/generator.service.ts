@@ -17,8 +17,13 @@ import type {
   AudienceRole,
   Chunk,
   ClaimRecord,
+  ClaimType,
   DraftVersion,
+  EvidenceRecord,
+  EvidenceState,
+  HandoverSection,
   Role,
+  Source,
 } from "@/types/echobridge.types";
 import { repository } from "@/lib/supabase/repository";
 import { getGeminiClient } from "@/lib/gemini/client";
@@ -29,6 +34,281 @@ import { isClaimStale } from "@/utils/date-freshness";
 import { computeConfidenceBreakdown } from "@/services/trust/confidence.service";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { getCampusConnectSeedData } from "@/services/seed/campus-connect.seed";
+
+const VALID_SECTIONS: ReadonlySet<HandoverSection> = new Set([
+  "architecture",
+  "decisions",
+  "tasks_dependencies",
+  "contacts_ownership",
+  "onboarding_day1",
+  "onboarding_week1",
+  "onboarding_month1",
+]);
+
+const VALID_CLAIM_TYPES: ReadonlySet<ClaimType> = new Set([
+  "decision",
+  "owner",
+  "risk",
+  "dependency",
+  "next_action",
+  "contact",
+]);
+
+const VALID_EVIDENCE_STATES: ReadonlySet<EvidenceState> = new Set([
+  "corroborated",
+  "single_source",
+  "attested",
+  "stale",
+  "conflicting",
+  "unsupported",
+  "restricted",
+]);
+
+function normalizeSectionValue(value: unknown, fallbackText = ""): HandoverSection {
+  if (typeof value === "string" && VALID_SECTIONS.has(value as HandoverSection)) {
+    return value as HandoverSection;
+  }
+  const lower = `${String(value || "")} ${fallbackText}`.toLowerCase();
+  if (
+    lower.includes("contact") ||
+    lower.includes("owner") ||
+    lower.includes("lead") ||
+    lower.includes("finance") ||
+    lower.includes("sponsor") ||
+    lower.includes("mentor")
+  ) {
+    return "contacts_ownership";
+  }
+  if (
+    lower.includes("task") ||
+    lower.includes("todo") ||
+    lower.includes("action") ||
+    lower.includes("deadline") ||
+    lower.includes("runbook") ||
+    lower.includes("migration")
+  ) {
+    return "tasks_dependencies";
+  }
+  if (lower.includes("day 1") || lower.includes("day1")) return "onboarding_day1";
+  if (lower.includes("week 1") || lower.includes("week1")) return "onboarding_week1";
+  if (lower.includes("month 1") || lower.includes("month1")) return "onboarding_month1";
+  if (
+    lower.includes("decision") ||
+    lower.includes("why") ||
+    lower.includes("rationale") ||
+    lower.includes("tradeoff")
+  ) {
+    return "decisions";
+  }
+  return "architecture";
+}
+
+function normalizeClaimTypeValue(value: unknown, fallbackText = ""): ClaimType {
+  if (typeof value === "string" && VALID_CLAIM_TYPES.has(value as ClaimType)) {
+    return value as ClaimType;
+  }
+  const lower = `${String(value || "")} ${fallbackText}`.toLowerCase();
+  if (lower.includes("risk") || lower.includes("warn") || lower.includes("conflict")) return "risk";
+  if (lower.includes("owner")) return "owner";
+  if (lower.includes("contact") || lower.includes("email")) return "contact";
+  if (lower.includes("depend")) return "dependency";
+  if (lower.includes("action") || lower.includes("todo") || lower.includes("next")) {
+    return "next_action";
+  }
+  return "decision";
+}
+
+function extractVerbatimQuotedSpan(chunkContent: string, preferredSpan?: string): string {
+  const cleanContent = chunkContent.trim();
+  if (!cleanContent) return "";
+
+  if (preferredSpan && preferredSpan.trim().length >= 8) {
+    const idx = cleanContent.toLowerCase().indexOf(preferredSpan.trim().toLowerCase());
+    if (idx !== -1) {
+      return cleanContent.slice(idx, idx + preferredSpan.trim().length);
+    }
+  }
+
+  // Pick first substantive line verbatim from chunkContent (up to 220 chars)
+  const lines = cleanContent
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length >= 12);
+  const chosen = lines[0] || cleanContent;
+  return chosen.length > 220 ? chosen.slice(0, 220).trimEnd() : chosen;
+}
+
+function normalizeGeminiClaims(params: {
+  rawItems: unknown[];
+  chunksById: Map<string, Chunk>;
+  sourcesById: Map<string, Source>;
+  targetRole: AudienceRole;
+  projectId: string;
+  draftVersionId: string;
+}): ClaimRecord[] {
+  const { rawItems, chunksById, sourcesById, targetRole, projectId, draftVersionId } = params;
+  const roleTag = targetRole === "incoming_lead" ? "LEAD" : "INT";
+  const normalized: ClaimRecord[] = [];
+  const seenIds = new Set<string>();
+
+  for (let i = 0; i < rawItems.length; i++) {
+    const item = rawItems[i];
+    if (!item || typeof item !== "object") continue;
+    const rec = item as Record<string, unknown>;
+    const text = typeof rec.text === "string" ? rec.text.trim() : "";
+    if (!text) continue;
+
+    const rawEvidence = Array.isArray(rec.evidence)
+      ? rec.evidence
+      : rec.chunk_id
+      ? [{ chunk_id: rec.chunk_id, quoted_span: rec.quoted_span }]
+      : [];
+
+    const builtEvidence: EvidenceRecord[] = [];
+    for (const evItem of rawEvidence) {
+      if (!evItem || typeof evItem !== "object") continue;
+      const ev = evItem as Record<string, unknown>;
+      const chunkId = typeof ev.chunk_id === "string" ? ev.chunk_id.trim() : "";
+      const chunk = chunksById.get(chunkId);
+      if (!chunk || !chunk.allowed_roles.includes(targetRole)) continue;
+
+      const source = sourcesById.get(chunk.source_id);
+      const quotedSpan = extractVerbatimQuotedSpan(
+        chunk.content,
+        typeof ev.quoted_span === "string" ? ev.quoted_span : undefined
+      );
+      if (!quotedSpan) continue;
+
+      builtEvidence.push({
+        chunk_id: chunk.id,
+        source_id: chunk.source_id,
+        source_type: source?.source_type || "document",
+        source_title: source?.title || chunk.source_id,
+        author: chunk.author || source?.author || "Team Contributor",
+        evidence_timestamp: chunk.chunk_timestamp || source?.source_timestamp || new Date().toISOString(),
+        quoted_span: quotedSpan,
+        is_verbatim_verified: true,
+        entailment_verdict: "supported",
+      });
+    }
+
+    const rawState = typeof rec.evidence_state === "string" ? rec.evidence_state : "";
+    const isExplicitUnsupported =
+      rawState === "unsupported" || text.toLowerCase().startsWith("insufficient evidence");
+
+    if (builtEvidence.length === 0 && !isExplicitUnsupported) {
+      continue;
+    }
+
+    let audienceAcl: AudienceRole[] = [targetRole];
+    if (builtEvidence.length > 0) {
+      const rolesSets = builtEvidence
+        .map((e) => chunksById.get(e.chunk_id)?.allowed_roles || [targetRole]);
+      audienceAcl = rolesSets.reduce<AudienceRole[]>(
+        (acc, curr) => acc.filter((r) => curr.includes(r)),
+        [...(rolesSets[0] || [targetRole])]
+      );
+      if (audienceAcl.length === 0) audienceAcl = [targetRole];
+    }
+
+    const candidateId =
+      typeof rec.id === "string" && rec.id.trim().length > 0 && !seenIds.has(rec.id.trim())
+        ? rec.id.trim()
+        : `CLM-GEN-${roleTag}-${i + 1}`;
+    seenIds.add(candidateId);
+
+    const evidenceState: EvidenceState = VALID_EVIDENCE_STATES.has(rawState as EvidenceState)
+      ? (rawState as EvidenceState)
+      : builtEvidence.length >= 2
+      ? "corroborated"
+      : builtEvidence.length === 1
+      ? "single_source"
+      : "unsupported";
+
+    normalized.push({
+      id: candidateId,
+      draft_version_id: draftVersionId,
+      project_id: projectId,
+      audience_role: targetRole,
+      section: normalizeSectionValue(rec.section, text),
+      claim_type: normalizeClaimTypeValue(rec.claim_type, text),
+      text,
+      evidence_state: evidenceState,
+      evidence: builtEvidence,
+      audience_acl: audienceAcl,
+      review: { status: "pending" },
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  return normalized;
+}
+
+export function synthesizeCustomChunkClaims(params: {
+  chunks: Chunk[];
+  alreadyCitedChunkIds: Set<string>;
+  sourcesById: Map<string, Source>;
+  targetRole: AudienceRole;
+  projectId: string;
+  draftVersionId: string;
+}): ClaimRecord[] {
+  const {
+    chunks,
+    alreadyCitedChunkIds,
+    sourcesById,
+    targetRole,
+    projectId,
+    draftVersionId,
+  } = params;
+  const roleTag = targetRole === "incoming_lead" ? "LEAD" : "INT";
+  const synthesized: ClaimRecord[] = [];
+
+  for (const chunk of chunks) {
+    if (alreadyCitedChunkIds.has(chunk.id)) continue;
+    const isCustomSource =
+      !chunk.source_id.startsWith("SRC-") || projectId !== "CampusConnect";
+    if (!isCustomSource) continue;
+    if (!chunk.allowed_roles.includes(targetRole)) continue;
+
+    const source = sourcesById.get(chunk.source_id);
+    const sourceTitle = source?.title || chunk.source_id;
+    const quotedSpan = extractVerbatimQuotedSpan(chunk.content);
+    if (!quotedSpan) continue;
+
+    const claimText = quotedSpan.replace(/^#+\s*/, "").trim();
+    const displayText = claimText.length >= 20 ? claimText : `${sourceTitle}: ${claimText}`;
+
+    synthesized.push({
+      id: `CLM-CUSTOM-${roleTag}-${chunk.id}`,
+      draft_version_id: draftVersionId,
+      project_id: projectId,
+      audience_role: targetRole,
+      section: normalizeSectionValue(undefined, `${sourceTitle} ${chunk.content}`),
+      claim_type: normalizeClaimTypeValue(undefined, `${sourceTitle} ${chunk.content}`),
+      text: displayText,
+      evidence_state: "single_source",
+      evidence: [
+        {
+          chunk_id: chunk.id,
+          source_id: chunk.source_id,
+          source_type: source?.source_type || "document",
+          source_title: sourceTitle,
+          author: chunk.author || source?.author || "Uploaded Contributor",
+          evidence_timestamp:
+            chunk.chunk_timestamp || source?.source_timestamp || new Date().toISOString(),
+          quoted_span: quotedSpan,
+          is_verbatim_verified: true,
+          entailment_verdict: "supported",
+        },
+      ],
+      audience_acl: [...chunk.allowed_roles],
+      review: { status: "pending" },
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  return synthesized;
+}
 
 export interface ReconstructionResult {
   draftVersion: DraftVersion;
@@ -68,48 +348,17 @@ export async function reconstructDraftForAudience(params: {
 
   // 2. Retrieve-Only Generation:
   // Synthesize atomic claims from permitted chunks (using Gemini if configured, or deterministic benchmark seed)
+  const draftVersionId = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.0`;
+  const allSources = await repository.listSources(projectId);
+  const sourcesById = new Map<string, Source>(allSources.map((s) => [s.id, s]));
+  const customPermittedChunks = permittedChunks.filter(
+    (c) => !c.source_id.startsWith("SRC-") || projectId !== "CampusConnect"
+  );
+
   let rawClaims: ClaimRecord[] = [];
-
   const gemini = getGeminiClient();
-  if (gemini && permittedChunks.length > 0) {
-    try {
-      const chunkXml = permittedChunks
-        .map(
-          (c) =>
-            `<chunk id="${c.id}" author="${c.author}" timestamp="${c.chunk_timestamp}">\n${c.content}\n</chunk>`
-        )
-        .join("\n\n");
 
-      const prompt = `You are EchoBridge Trust Pipeline Generator.
-Synthesize verified atomic handover claims strictly based on the following authorised sources:
-${chunkXml}
-
-Rules:
-1. Every claim MUST be directly substantiated by the text in a <chunk>.
-2. Every claim MUST cite the chunk id and the exact verbatim quoted_span from that chunk.
-3. If an important topic (e.g., domain renewal ownership, or Redis architecture rationale) has no supporting chunk, output an atomic claim with evidence_state: "unsupported" and text: "Insufficient evidence in sources: [topic]".
-4. Return a JSON object with array "claims".`;
-
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          temperature: 0,
-          responseMimeType: "application/json",
-        },
-      });
-
-      const parsed = JSON.parse(response.text?.trim() || "{}");
-      if (Array.isArray(parsed.claims) && parsed.claims.length > 0) {
-        rawClaims = parsed.claims;
-      }
-    } catch {
-      // Fall through to deterministic benchmark seed
-    }
-  }
-
-  // If Gemini is unconfigured or failed, load deterministic high-fidelity seed claims
-  if (rawClaims.length === 0) {
+  if (projectId === "CampusConnect") {
     const seed = getCampusConnectSeedData();
     const seedDraft = seed.drafts.find(
       (d) => d.audience_role === targetRole && d.version_label === "v1.0"
@@ -117,6 +366,112 @@ Rules:
     if (seedDraft && seedDraft.claims.length > 0) {
       rawClaims = JSON.parse(JSON.stringify(seedDraft.claims));
     }
+
+    if (gemini && customPermittedChunks.length > 0) {
+      try {
+        const chunkXml = customPermittedChunks
+          .map(
+            (c) =>
+              `<chunk id="${c.id}" author="${c.author}" timestamp="${c.chunk_timestamp}">\n${c.content}\n</chunk>`
+          )
+          .join("\n\n");
+
+        const prompt = `You are EchoBridge Trust Pipeline Generator.
+Synthesize verified atomic handover claims strictly based on the following authorised custom project sources:
+${chunkXml}
+
+Rules:
+1. Every claim MUST be directly substantiated by the text in a <chunk>.
+2. Every claim MUST cite chunk_id and exact verbatim quoted_span from that chunk.
+3. section MUST be one of: architecture, decisions, tasks_dependencies, contacts_ownership, onboarding_day1, onboarding_week1, onboarding_month1.
+4. claim_type MUST be one of: decision, owner, risk, dependency, next_action, contact.
+5. Return a JSON object with array "claims".`;
+
+        const response = await gemini.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0,
+            responseMimeType: "application/json",
+          },
+        });
+
+        const parsed = JSON.parse(response.text?.trim() || "{}");
+        if (Array.isArray(parsed.claims) && parsed.claims.length > 0) {
+          const geminiClaims = normalizeGeminiClaims({
+            rawItems: parsed.claims,
+            chunksById,
+            sourcesById,
+            targetRole,
+            projectId,
+            draftVersionId,
+          });
+          rawClaims.push(...geminiClaims);
+        }
+      } catch {
+        // Fall through to deterministic custom chunk synthesis
+      }
+    }
+  } else {
+    if (gemini && permittedChunks.length > 0) {
+      try {
+        const chunkXml = permittedChunks
+          .map(
+            (c) =>
+              `<chunk id="${c.id}" author="${c.author}" timestamp="${c.chunk_timestamp}">\n${c.content}\n</chunk>`
+          )
+          .join("\n\n");
+
+        const prompt = `You are EchoBridge Trust Pipeline Generator.
+Synthesize verified atomic handover claims strictly based on the following authorised sources:
+${chunkXml}
+
+Rules:
+1. Every claim MUST be directly substantiated by the text in a <chunk>.
+2. Every claim MUST cite the chunk_id and the exact verbatim quoted_span from that chunk.
+3. If an important topic has no supporting chunk, output an atomic claim with evidence_state: "unsupported" and text: "Insufficient evidence in sources: [topic]".
+4. Return a JSON object with array "claims".`;
+
+        const response = await gemini.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0,
+            responseMimeType: "application/json",
+          },
+        });
+
+        const parsed = JSON.parse(response.text?.trim() || "{}");
+        if (Array.isArray(parsed.claims) && parsed.claims.length > 0) {
+          rawClaims = normalizeGeminiClaims({
+            rawItems: parsed.claims,
+            chunksById,
+            sourcesById,
+            targetRole,
+            projectId,
+            draftVersionId,
+          });
+        }
+      } catch {
+        // Fall through to deterministic custom chunk synthesis
+      }
+    }
+  }
+
+  // Ensure every custom/newly ingested chunk gets at least one grounded verified claim
+  const citedChunkIds = new Set<string>(
+    rawClaims.flatMap((c) => (c.evidence || []).map((e) => e.chunk_id))
+  );
+  const customFallbackClaims = synthesizeCustomChunkClaims({
+    chunks: permittedChunks,
+    alreadyCitedChunkIds: citedChunkIds,
+    sourcesById,
+    targetRole,
+    projectId,
+    draftVersionId,
+  });
+  if (customFallbackClaims.length > 0) {
+    rawClaims.push(...customFallbackClaims);
   }
 
   // 3. Two-Layer Citation Verification:
@@ -172,7 +527,6 @@ Rules:
   const confidence = computeConfidenceBreakdown(finalClaims);
 
   // 7. Construct and Persist DraftVersion (v1.0):
-  const draftVersionId = `DFT-${targetRole === "incoming_lead" ? "LEAD" : "INT"}-v1.0`;
   const draftVersion: DraftVersion = {
     id: draftVersionId,
     project_id: projectId,
@@ -186,6 +540,44 @@ Rules:
 
   // Save to repository
   await repository.saveDraftVersion(draftVersion);
+
+  // Propagate any newly reconstructed custom claims into existing higher versions (v1.1 / v2.0)
+  // so newly ingested sources appear immediately in Review & Handover without losing existing reviews.
+  const newlySynthesizedClaims = finalClaims.filter(
+    (c) =>
+      c.id.startsWith("CLM-CUSTOM-") ||
+      c.id.startsWith("CLM-GEN-") ||
+      c.evidence.some((e) => !e.source_id.startsWith("SRC-"))
+  );
+  if (newlySynthesizedClaims.length > 0) {
+    for (const versionLabel of ["v1.1", "v2.0"] as const) {
+      const existingHigherDraft = await repository.getDraftVersion(
+        projectId,
+        targetRole,
+        versionLabel
+      );
+      if (!existingHigherDraft) continue;
+
+      const existingIds = new Set(existingHigherDraft.claims.map((c) => c.id));
+      const suffix = versionLabel === "v1.1" ? "-V1.1" : "-V2.0";
+      const missingCustom = newlySynthesizedClaims
+        .map((c) => ({
+          ...c,
+          id: c.id.endsWith(suffix) ? c.id : `${c.id}${suffix}`,
+          draft_version_id: existingHigherDraft.id,
+        }))
+        .filter((c) => !existingIds.has(c.id));
+
+      if (missingCustom.length > 0) {
+        const mergedClaims = [...existingHigherDraft.claims, ...missingCustom];
+        await repository.saveDraftVersion({
+          ...existingHigherDraft,
+          claims: mergedClaims,
+          confidence: computeConfidenceBreakdown(mergedClaims),
+        });
+      }
+    }
+  }
 
   // Log draft_generated audit event
   await logAuditEvent({

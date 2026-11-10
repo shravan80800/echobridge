@@ -23,7 +23,8 @@ export default function GapInterviewPage() {
     try {
       setIsLoading(true);
       const res = await fetch(
-        "/api/gap-interview?projectId=CampusConnect&role=incoming_lead"
+        "/api/gap-interview?projectId=CampusConnect&role=incoming_lead",
+        { cache: "no-store" }
       );
       const json = await res.json();
       if (json.success) {

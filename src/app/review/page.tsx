@@ -75,9 +75,10 @@ export default function ReviewPage() {
       setIsLoading(true);
       const [reviewRes, ingestRes] = await Promise.all([
         fetch(
-          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=${fromVersion}&toVersion=${toVersion}`
+          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=${fromVersion}&toVersion=${toVersion}`,
+          { cache: "no-store" }
         ),
-        fetch("/api/ingest?projectId=CampusConnect"),
+        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
       ]);
 
       const [json, ingestJson] = await Promise.all([

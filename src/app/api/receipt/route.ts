@@ -7,6 +7,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { repository } from "@/lib/supabase/repository";
+
+export const dynamic = "force-dynamic";
 import {
   getComprehensionQuestions,
   evaluateComprehensionQuiz,
@@ -55,6 +58,15 @@ export async function POST(request: NextRequest) {
     const incomingUserName =
       body.incomingUserName ||
       (audienceRole === "incoming_lead" ? "Riya Patel" : "Kabir Mehta");
+
+    if (action === "reset") {
+      await repository.clearReceipts(projectId, audienceRole);
+      return NextResponse.json({
+        success: true,
+        message: `Receipt cleared for ${audienceRole} so a fresh handover receipt can be generated.`,
+        receipt: null,
+      });
+    }
 
     if (!body.answers || !Array.isArray(body.answers)) {
       return NextResponse.json(

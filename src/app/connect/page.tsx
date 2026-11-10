@@ -49,6 +49,7 @@ export default function ConnectPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isResettingSeed, setIsResettingSeed] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
   const [aclScopeMap, setAclScopeMap] = useState<AclScopeItem[]>([]);
   const [quarantinedSecrets, setQuarantinedSecrets] = useState<
@@ -71,7 +72,9 @@ export default function ConnectPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/ingest?projectId=CampusConnect");
+      const res = await fetch("/api/ingest?projectId=CampusConnect", {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!json.success) {
         throw new Error(json.error || "Failed to load project sources");
@@ -90,6 +93,38 @@ export default function ConnectPage() {
   useEffect(() => {
     fetchIngestionData();
   }, [fetchIngestionData]);
+
+  const handleReloadSeed = async () => {
+    try {
+      setIsResettingSeed(true);
+      setError(null);
+      setSuccessBanner(null);
+
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          projectId: "CampusConnect",
+          useSeed: true,
+          reset: true,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || "Failed to reload baseline seed data");
+      }
+
+      await fetchIngestionData();
+      setSuccessBanner(
+        "Project sources, drafts, and handover receipts reset cleanly to CampusConnect baseline."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reload seed");
+    } finally {
+      setIsResettingSeed(false);
+    }
+  };
 
   const handleGenerateDraft = async () => {
     try {
@@ -208,6 +243,14 @@ export default function ConnectPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Button
+            variant="secondary"
+            onClick={handleReloadSeed}
+            isLoading={isResettingSeed}
+          >
+            Reload Seed
+          </Button>
+
           <Button
             variant="secondary"
             onClick={() => setIsModalOpen(true)}

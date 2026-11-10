@@ -45,6 +45,7 @@ export default function HandoverPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResettingReceipt, setIsResettingReceipt] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   // Sync automatically with active navbar role switcher
@@ -67,11 +68,14 @@ export default function HandoverPage() {
     try {
       setIsLoading(true);
       const [receiptRes, reviewRes, ingestRes] = await Promise.all([
-        fetch(`/api/receipt?projectId=CampusConnect&role=${audienceRole}`),
+        fetch(`/api/receipt?projectId=CampusConnect&role=${audienceRole}`, {
+          cache: "no-store",
+        }),
         fetch(
-          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`
+          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`,
+          { cache: "no-store" }
         ),
-        fetch("/api/ingest?projectId=CampusConnect"),
+        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
       ]);
 
       const [receiptJson, reviewJson, ingestJson] = await Promise.all([
@@ -119,6 +123,7 @@ export default function HandoverPage() {
       const res = await fetch("/api/receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({
           action: "acknowledge",
           projectId: "CampusConnect",
@@ -134,6 +139,7 @@ export default function HandoverPage() {
         setFeedbackMessage(
           `Handover receipt acknowledged by ${recipientName}.`
         );
+        setIsQuizModalOpen(false);
         setIsCertificateModalOpen(true);
       } else {
         throw new Error(
@@ -142,6 +148,35 @@ export default function HandoverPage() {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResetReceipt = async () => {
+    try {
+      setIsResettingReceipt(true);
+      setFeedbackMessage(null);
+      const res = await fetch("/api/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          action: "reset",
+          projectId: "CampusConnect",
+          audienceRole,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReceipt(null);
+        setIsCertificateModalOpen(false);
+        setFeedbackMessage(
+          `Receipt cleared for ${recipientName}. Click Acknowledge to generate a fresh signature.`
+        );
+      }
+    } catch (err) {
+      console.error("Failed to reset receipt:", err);
+    } finally {
+      setIsResettingReceipt(false);
     }
   };
 
@@ -345,6 +380,8 @@ export default function HandoverPage() {
           cleanMode
           onOpenQuizModal={() => setIsQuizModalOpen(true)}
           onOpenCertificateModal={() => setIsCertificateModalOpen(true)}
+          onResetReceipt={handleResetReceipt}
+          isResetting={isResettingReceipt}
           isIncomingRole={currentRole === audienceRole}
         />
 

@@ -66,8 +66,8 @@ export default function DraftPage() {
       setError(null);
 
       const [draftRes, ingestRes] = await Promise.all([
-        fetch("/api/reconstruct?projectId=CampusConnect"),
-        fetch("/api/ingest?projectId=CampusConnect"),
+        fetch("/api/reconstruct?projectId=CampusConnect", { cache: "no-store" }),
+        fetch("/api/ingest?projectId=CampusConnect", { cache: "no-store" }),
       ]);
 
       const draftJson = await draftRes.json();

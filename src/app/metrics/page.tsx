@@ -26,7 +26,9 @@ export default function MetricsPage() {
   const fetchMetrics = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/metrics?projectId=CampusConnect");
+      const res = await fetch("/api/metrics?projectId=CampusConnect", {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.success) {
         setMetrics(json);

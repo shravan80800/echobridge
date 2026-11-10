@@ -17,6 +17,8 @@ import {
 import type { AudienceRole } from "@/types/echobridge.types";
 import { repository } from "@/lib/supabase/repository";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -87,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "reset") {
-      repository.resetInMemoryStore(true);
+      await repository.resetProjectStore(projectId);
       const questions = await getOrGenerateGapQuestions(projectId, audienceRole);
       return NextResponse.json({
         success: true,

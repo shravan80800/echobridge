@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShieldCheck, AlertCircle, Award, Copy, Check } from "lucide-react";
+import {
+  ShieldCheck,
+  AlertCircle,
+  Award,
+  Copy,
+  Check,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Receipt } from "@/types/echobridge.types";
 
@@ -12,6 +20,8 @@ interface ReceiptBannerProps {
   cleanMode?: boolean;
   onOpenQuizModal: () => void;
   onOpenCertificateModal: () => void;
+  onResetReceipt?: () => void;
+  isResetting?: boolean;
   isIncomingRole: boolean;
 }
 
@@ -22,6 +32,8 @@ export function ReceiptBanner({
   cleanMode = false,
   onOpenQuizModal,
   onOpenCertificateModal,
+  onResetReceipt,
+  isResetting = false,
 }: ReceiptBannerProps) {
   const [copied, setCopied] = useState(false);
 
@@ -97,7 +109,7 @@ export function ReceiptBanner({
           </div>
         </div>
 
-        <div className="shrink-0 self-start sm:self-center">
+        <div className="shrink-0 self-start sm:self-center flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
@@ -106,6 +118,27 @@ export function ReceiptBanner({
           >
             {cleanMode ? "View Receipt Certificate" : "View Certificate"}
           </Button>
+          {cleanMode && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenQuizModal}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5 text-teal-700" />}
+            >
+              Re-acknowledge
+            </Button>
+          )}
+          {onResetReceipt && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onResetReceipt}
+              isLoading={isResetting}
+              leftIcon={<RotateCcw className="w-3.5 h-3.5 text-slate-600" />}
+            >
+              Reset
+            </Button>
+          )}
         </div>
       </div>
     );

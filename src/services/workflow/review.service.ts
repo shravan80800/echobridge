@@ -239,6 +239,68 @@ export function computeVersionDiff(
   };
 }
 
+function stripClaimVersionSuffix(claimId: string): string {
+  return claimId.replace(/-V1\.[012]|-V2\.0/g, "");
+}
+
+function findMatchingClaimIndex(
+  claims: ClaimRecord[],
+  claimId: string,
+  matchTrap1 = false
+): number {
+  const targetBase = stripClaimVersionSuffix(claimId);
+  return claims.findIndex(
+    (c) =>
+      c.id === claimId ||
+      stripClaimVersionSuffix(c.id) === targetBase ||
+      (matchTrap1 && c.planted_trap_id === 1 && claimId.includes("TRAP-1"))
+  );
+}
+
+async function syncClaimAcrossVersions(params: {
+  projectId: string;
+  audienceRole: AudienceRole;
+  primaryDraftId: string;
+  claimId: string;
+  updatedFields: Partial<ClaimRecord>;
+  matchTrap1?: boolean;
+}): Promise<void> {
+  const {
+    projectId,
+    audienceRole,
+    primaryDraftId,
+    claimId,
+    updatedFields,
+    matchTrap1 = false,
+  } = params;
+
+  for (const label of ["v1.1", "v2.0"] as const) {
+    const draft = await repository.getDraftVersion(
+      projectId,
+      audienceRole,
+      label
+    );
+    if (!draft || draft.id === primaryDraftId) continue;
+
+    const idx = findMatchingClaimIndex(draft.claims, claimId, matchTrap1);
+    if (idx < 0) continue;
+
+    const nextClaims: ClaimRecord[] = JSON.parse(JSON.stringify(draft.claims));
+    nextClaims[idx] = {
+      ...nextClaims[idx],
+      ...updatedFields,
+      id: nextClaims[idx].id,
+      draft_version_id: draft.id,
+    };
+
+    await repository.saveDraftVersion({
+      ...draft,
+      claims: nextClaims,
+      confidence: computeConfidenceBreakdown(nextClaims),
+    });
+  }
+}
+
 /**
  * Reviews a single claim (approve, edit, redact, reject).
  * Emits an immutable audit log and updates the claim in repository.
@@ -324,7 +386,7 @@ export async function reviewClaim(params: {
     targetClaim.review.notes = notes || "Redacted sensitive proprietary detail";
   }
 
-  // 4. Update in repository
+  // 4. Update in repository across active draft versions
   await repository.updateClaimReview(targetClaim.id, targetClaim.review);
 
   // If in latest draft claims, replace and recalculate confidence
@@ -332,6 +394,17 @@ export async function reviewClaim(params: {
     latestDraft.claims[claimIndex] = targetClaim;
     latestDraft.confidence = computeConfidenceBreakdown(latestDraft.claims);
     await repository.saveDraftVersion(latestDraft);
+    await syncClaimAcrossVersions({
+      projectId,
+      audienceRole,
+      primaryDraftId: latestDraft.id,
+      claimId: targetClaim.id,
+      updatedFields: {
+        text: targetClaim.text,
+        evidence_state: targetClaim.evidence_state,
+        review: targetClaim.review,
+      },
+    });
   }
 
   // 5. Emit immutable audit log
@@ -437,10 +510,23 @@ export async function resolveConflict(params: {
     notes: `Conflict resolved in favour of ${winningSide}: ${resolvedText}`,
   };
 
-  // 4. Update latest draft and recalculate Confidence (conflict rate drops!)
+  // 4. Update latest draft and synchronize conflict resolution across v1.1 & v2.0
   latestDraft.claims[claimIndex] = claim;
   latestDraft.confidence = computeConfidenceBreakdown(latestDraft.claims);
   await repository.saveDraftVersion(latestDraft);
+  await syncClaimAcrossVersions({
+    projectId,
+    audienceRole,
+    primaryDraftId: latestDraft.id,
+    claimId: claim.id,
+    updatedFields: {
+      text: claim.text,
+      evidence_state: claim.evidence_state,
+      conflict_pair: claim.conflict_pair,
+      review: claim.review,
+    },
+    matchTrap1: true,
+  });
 
   // 5. Emit immutable audit event
   await logAuditEvent({
@@ -485,7 +571,7 @@ export async function approveHandover(params: {
   // 1. Enforce Separation of Duties (ADR-007)
   assertReviewerAuthority(actorRole);
 
-  // 2. Fetch base draft (v1.1 or v1.0)
+  // 2. Fetch base draft (v1.1 or v1.0) and merge any custom v1.0 claims
   const baseDraft =
     (await repository.getDraftVersion(projectId, audienceRole, "v1.1")) ||
     (await repository.getDraftVersion(projectId, audienceRole, "v1.0"));
@@ -494,13 +580,28 @@ export async function approveHandover(params: {
     throw new Error(`Base draft version not found for ${projectId} / ${audienceRole}`);
   }
 
-  // Clone claims and mark any remaining pending claims as approved
+  // Clone claims and merge any custom/generated claims from v1.0 that aren't already present
   const v2Claims: ClaimRecord[] = JSON.parse(JSON.stringify(baseDraft.claims));
+  const v10Draft = await repository.getDraftVersion(projectId, audienceRole, "v1.0");
+  if (v10Draft) {
+    const existingBaseIds = new Set(v2Claims.map((c) => stripClaimVersionSuffix(c.id)));
+    for (const c of v10Draft.claims) {
+      const isCustom =
+        c.id.startsWith("CLM-CUSTOM-") ||
+        c.id.startsWith("CLM-GEN-") ||
+        (c.evidence || []).some((e) => !e.source_id.startsWith("SRC-"));
+      if (isCustom && !existingBaseIds.has(stripClaimVersionSuffix(c.id))) {
+        v2Claims.push(JSON.parse(JSON.stringify(c)));
+        existingBaseIds.add(stripClaimVersionSuffix(c.id));
+      }
+    }
+  }
 
+  const targetV2Id = `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`;
   for (const c of v2Claims) {
-    const baseId = c.id.replace(/-V1\.[012]|-V2\.0/g, "");
+    const baseId = stripClaimVersionSuffix(c.id);
     c.id = `${baseId}-V2.0`;
-    c.draft_version_id = `DFT-${audienceRole === "incoming_lead" ? "LEAD" : "INT"}-v2.0`;
+    c.draft_version_id = targetV2Id;
 
     if (c.evidence_state === "conflicting") {
       c.evidence_state = "corroborated";

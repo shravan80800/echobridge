@@ -15,6 +15,8 @@ import {
 } from "@/services/trust/generator.service";
 import type { AudienceRole } from "@/types/echobridge.types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
