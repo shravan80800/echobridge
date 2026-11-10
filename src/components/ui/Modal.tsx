@@ -10,7 +10,7 @@ export interface ModalProps {
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  maxWidth?: "sm" | "md" | "lg" | "xl";
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "3xl";
   closeOnBackdropClick?: boolean;
 }
 
@@ -19,6 +19,7 @@ const maxWidthClasses = {
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-2xl",
+  "3xl": "max-w-4xl",
 };
 
 export function Modal({
@@ -63,7 +64,7 @@ export function Modal({
 
       {/* Dialog Window */}
       <div
-        className={`relative z-10 w-full ${maxWidthClasses[maxWidth]} bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-2xl text-slate-900`}
+        className={`relative z-10 my-auto max-h-[92vh] overflow-y-auto w-full ${maxWidthClasses[maxWidth]} bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-2xl text-slate-900`}
       >
         {/* Header */}
         {(title || description) && (

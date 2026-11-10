@@ -32,11 +32,13 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-teal-100 selection:text-teal-900 flex flex-col overflow-x-hidden">
         <RoleProvider>
-          <Navbar />
-          <div className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            {children}
+          <div id="echobridge-app-shell" className="flex-1 flex flex-col min-h-screen">
+            <Navbar />
+            <div className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+              {children}
+            </div>
+            <AuditLogDrawer />
           </div>
-          <AuditLogDrawer />
         </RoleProvider>
       </body>
     </html>
