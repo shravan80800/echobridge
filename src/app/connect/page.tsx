@@ -11,6 +11,10 @@ import {
   DollarSign,
   CheckCircle2,
   Lock,
+  Globe,
+  Link2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -68,6 +72,14 @@ export default function ConnectPage() {
   const [customPath, setCustomPath] = useState("docs/custom_guide.md");
   const [customContent, setCustomContent] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+
+  // Live URL Importer State (GitHub & Public Google Docs)
+  const [isLiveImporterOpen, setIsLiveImporterOpen] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [isImportingGithub, setIsImportingGithub] = useState(false);
+  const [googleDocUrl, setGoogleDocUrl] = useState("");
+  const [isImportingDoc, setIsImportingDoc] = useState(false);
 
   const fetchIngestionData = useCallback(async () => {
     try {
@@ -193,6 +205,68 @@ export default function ConnectPage() {
     }
   };
 
+  const handleLiveImport = async (
+    importType: "github" | "google_doc",
+    url: string,
+    token?: string
+  ) => {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+
+    const setBusy =
+      importType === "github" ? setIsImportingGithub : setIsImportingDoc;
+
+    try {
+      setBusy(true);
+      setError(null);
+      setSuccessBanner(null);
+
+      const res = await fetch("/api/live-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          type: importType,
+          url: trimmedUrl,
+          token: token?.trim() || undefined,
+          projectId: "CampusConnect",
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Live import failed");
+      }
+
+      if (importType === "github") {
+        setGithubUrl("");
+      } else {
+        setGoogleDocUrl("");
+      }
+
+      setSuccessBanner(
+        `${json.message || "Live content ingested and draft updated."} (${json.sourcesIngested ?? 1} source${json.sourcesIngested === 1 ? "" : "s"}, ${json.chunksCreated ?? 0} chunks indexed).`
+      );
+      await fetchIngestionData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to import live URL");
+    } finally {
+      // Never retain optional access tokens in React state
+      setGithubToken("");
+      setBusy(false);
+    }
+  };
+
+  const handleGitHubImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleLiveImport("github", githubUrl, githubToken);
+  };
+
+  const handleGoogleDocImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleLiveImport("google_doc", googleDocUrl);
+  };
+
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
       case "document":
@@ -316,6 +390,159 @@ export default function ConnectPage() {
       {showHiddenItems && (
         <RedactionQuarantineTable secrets={quarantinedSecrets} />
       )}
+
+      {/* ==================================================================== */}
+      {/* 2B. COLLAPSIBLE LIVE URL IMPORTER (GITHUB & PUBLIC GOOGLE DOCS)     */}
+      {/* ==================================================================== */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2 rounded-lg bg-teal-50 border border-teal-200 text-teal-700 shrink-0">
+              <Globe className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                Connect Live GitHub Repo or Google Doc URL
+              </h2>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Import live README, commits, issues, PRs, or public Google Docs directly — no OAuth needed.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsLiveImporterOpen((prev) => !prev)}
+            rightIcon={
+              isLiveImporterOpen ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )
+            }
+            className="shrink-0 self-start sm:self-center"
+          >
+            {isLiveImporterOpen ? "Hide Importer" : "Open Importer"}
+          </Button>
+        </div>
+
+        {isLiveImporterOpen && (
+          <div className="border-t border-slate-200 bg-slate-50/50 p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Panel A: GitHub Repository Importer */}
+            <form
+              onSubmit={handleGitHubImport}
+              className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-3"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-4 h-4 text-teal-700 shrink-0" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      GitHub Repository
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGithubUrl("https://github.com/shravan80800/echobridge")
+                    }
+                    className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline cursor-pointer"
+                  >
+                    Try sample repo
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Repository URL
+                  </label>
+                  <input
+                    type="text"
+                    value={githubUrl}
+                    onChange={(e) => setGithubUrl(e.target.value)}
+                    placeholder="https://github.com/owner/repo"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Personal Access Token (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    placeholder="ghp_... (only needed for private repos)"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Used only for this request and never stored or saved into handover notes.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                isLoading={isImportingGithub}
+                disabled={isImportingDoc || !githubUrl.trim()}
+                className="w-full"
+              >
+                {isImportingGithub ? "Importing Repo..." : "Connect GitHub Repo →"}
+              </Button>
+            </form>
+
+            {/* Panel B: Public Google Doc Importer */}
+            <form
+              onSubmit={handleGoogleDocImport}
+              className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-3"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-teal-700 shrink-0" />
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Google Doc (Public Link)
+                  </h3>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Shared Document URL
+                  </label>
+                  <input
+                    type="text"
+                    value={googleDocUrl}
+                    onChange={(e) => setGoogleDocUrl(e.target.value)}
+                    placeholder="https://docs.google.com/document/d/..."
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    required
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Make sure link sharing is set to &ldquo;Anyone with the link can view&rdquo;.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                isLoading={isImportingDoc}
+                disabled={isImportingGithub || !googleDocUrl.trim()}
+                className="w-full"
+              >
+                {isImportingDoc ? "Importing Doc..." : "Import Google Doc →"}
+              </Button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* ==================================================================== */}
       {/* 3. CLEAN, MOBILE-FRIENDLY SOURCE LIST                                */}
