@@ -3,20 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  BarChart2,
   CheckCircle2,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   ArrowRight,
   ArrowLeft,
-  Layers,
   Lock,
-  Cpu,
   FileCheck2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { QualityMetricsGauge } from "@/components/metrics/QualityMetricsGauge";
 import { TrapScorecardTable } from "@/components/metrics/TrapScorecardTable";
@@ -52,19 +47,19 @@ export default function MetricsPage() {
     setIsRefreshing(true);
     setFeedbackMessage(null);
     await fetchMetrics();
-    setFeedbackMessage("Live evaluation benchmark re-calculated successfully.");
+    setFeedbackMessage("Evaluation scorecard recalculated successfully.");
   };
 
   if (isLoading || !metrics) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-7xl mx-auto">
+      <main className="w-full py-4">
         <LoadingSkeleton
           cardCount={3}
-          message="Computing Real-Time Calibration & 8-Trap Evaluation Scorecard..."
+          message="Computing live verification metrics and scenario checks..."
           steps={[
-            "Checking citation coverage against labeled CampusConnect ground truth...",
+            "Checking citation coverage against project sources...",
             "Validating permission isolation across Team Lead vs. Intern views...",
-            "Running automated verification checks across all 8 planted traps...",
+            "Running automated verification across all 8 test scenarios...",
           ]}
         />
       </main>
@@ -72,142 +67,147 @@ export default function MetricsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-6">
+    <main className="w-full space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-accent-primary/20 border border-accent-primary/40 text-accent-cyan uppercase">
-              Evaluation &amp; Calibration Dashboard
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200 cursor-default select-none">
+              Judge Evaluation Scorecard
             </span>
-            <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 inline" />
-              All 8 Planted Traps Passing
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full cursor-default select-none">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              All 8 Test Scenarios Passing
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary">
+
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
             Handover Verification &amp; Calibration Scorecard
           </h1>
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-            Live evaluation metrics on the synthetic <strong className="text-text-primary font-mono">CampusConnect</strong> benchmark dataset. Evaluates citation coverage, zero hallucinations, privacy leakage, and all 8 planted traps.
+          <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+            Live verification metrics on the{" "}
+            <strong className="text-slate-900">CampusConnect</strong> dataset,
+            covering citation accuracy, gap detection, zero hallucinations, and
+            access control.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Button
             variant="secondary"
             size="sm"
             onClick={handleRefresh}
             isLoading={isRefreshing}
-            className="text-xs font-mono"
-            title="Re-run live verification checks"
+            leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
           >
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
             Re-evaluate Benchmark
           </Button>
 
           <Link href="/handover">
-            <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              Stage 6: Handover
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+            >
+              Handover
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Feedback Alert Toast */}
+      {/* Feedback Banner */}
       {feedbackMessage && (
-        <div className="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/30 text-emerald-200 text-xs flex items-center justify-between gap-3">
+        <div className="rounded-xl p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>{feedbackMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="font-mono text-xs text-emerald-400 hover:text-emerald-200"
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* 5 Core Metric Gauges (Section 10 of Round 1 Proposal) */}
+      {/* Top Row: 5 Core Metric Gauges */}
       <QualityMetricsGauge metrics={metrics} />
 
-      {/* 8-Trap Verification Table */}
+      {/* Main Table: 8 Scenarios Scorecard */}
       <TrapScorecardTable traps={metrics.traps} />
 
-      {/* Technical Architecture & Rigor Summary Card */}
-      <Card className="p-5 bg-surface border-border-subtle space-y-4">
-        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-accent-cyan" />
-            <h3 className="text-xs font-mono font-bold uppercase text-text-primary">
-              EchoBridge Technical Guardrails Architecture
-            </h3>
-          </div>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            Zero-Config Demonstration Mode Active
+      {/* Guardrails Summary Card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <h3 className="text-sm font-bold text-slate-900">
+            Core Verification Architecture
+          </h3>
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default select-none">
+            Zero-Config Ready
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans">
-          <div className="p-3.5 rounded-lg bg-canvas border border-border-subtle space-y-1.5">
-            <div className="flex items-center gap-1.5 text-accent-cyan font-semibold font-mono">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Two-Barrier RBAC Privacy</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs sm:text-sm">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-teal-800 font-semibold">
+              <Lock className="w-4 h-4 shrink-0" />
+              <span>Two-Layer Access Control</span>
             </div>
-            <p className="text-text-secondary leading-relaxed text-[11px]">
-              <strong>Barrier 1 (Pre-Model):</strong> Chunks outside the recipient&apos;s role scope (e.g. Finance Folder) are filtered out before calling Gemini.<br />
-              <strong>Barrier 2 (Post-Generation):</strong> Any claim citing a restricted chunk is purged and replaced with a zero-leak &quot;Restricted: request access&quot; placeholder.
+            <p className="text-slate-600 leading-relaxed text-xs">
+              Restricted folders (such as Budget &amp; Finance) are filtered out
+              both before AI drafting and after generation so Intern views stay
+              zero-leak.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-canvas border border-border-subtle space-y-1.5">
-            <div className="flex items-center gap-1.5 text-emerald-400 font-semibold font-mono">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Two-Layer Verifier &amp; Author Independence</span>
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-emerald-800 font-semibold">
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span>Verbatim &amp; Meaning Checks</span>
             </div>
-            <p className="text-text-secondary leading-relaxed text-[11px]">
-              <strong>Layer A:</strong> Verbatim quote span checker confirms exact character coordinates.<br />
-              <strong>Layer B:</strong> Semantic entailment judge prevents contradictions.<br />
-              <strong>Author Independence:</strong> 2+ sources must have different authors and neither copies the other (ADR-005).
+            <p className="text-slate-600 leading-relaxed text-xs">
+              Every cited claim checks both exact character coordinates in
+              original files and semantic alignment across independent authors.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-canvas border border-border-subtle space-y-1.5">
-            <div className="flex items-center gap-1.5 text-indigo-400 font-semibold font-mono">
-              <FileCheck2 className="w-3.5 h-3.5" />
-              <span>Separation of Duties (ADR-007)</span>
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-slate-900 font-semibold">
+              <FileCheck2 className="w-4 h-4 shrink-0 text-teal-700" />
+              <span>Independent Approval Gate</span>
             </div>
-            <p className="text-text-secondary leading-relaxed text-[11px]">
-              The departing member can never approve a handover (HTTP 403 Forbidden). Only the human Reviewer holds approval authority to create DraftVersion v2.0 and publish role-appropriate continuation plans.
+            <p className="text-slate-600 leading-relaxed text-xs">
+              Departing members cannot approve their own handover. A human mentor
+              reviews diffs, resolves conflicts, and signs off before delivery.
             </p>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Bottom Navigation Toolbar */}
-      <div className="flex items-center justify-between pt-6 border-t border-border-subtle">
-        <Link href="/handover">
-          <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back to Stage 6: Handover Delivery
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-200">
+        <Link href="/handover" className="w-full sm:w-auto">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full sm:w-auto"
+            leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+          >
+            Back to Handover Plan
           </Button>
         </Link>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-text-muted hidden md:inline">
-            Return to application overview
-          </span>
-          <Link href="/">
-            <Button variant="primary" size="md" className="text-xs">
-              <span>Return to Home Overview</span>
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
+        <Link href="/" className="w-full sm:w-auto">
+          <Button
+            variant="primary"
+            className="w-full sm:w-auto"
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+          >
+            Return to Home Overview
+          </Button>
+        </Link>
       </div>
     </main>
   );

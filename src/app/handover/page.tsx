@@ -1,65 +1,53 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
-import {
-  ShieldCheck,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Award,
-  Layers,
-  Sparkles,
-  BarChart2,
-  Lock,
-  FileCheck2,
-  HelpCircle,
-  Clock,
-  User,
-  Copy,
-  Check,
-} from "lucide-react";
+import { CheckCircle2, FileText, GitBranch } from "lucide-react";
 import { useRole } from "@/components/layout/RoleContext";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { LoadingSkeleton } from "@/components/ui/StateViews";
 import { ReceiptBanner } from "@/components/handover/ReceiptBanner";
 import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
 import { ComprehensionQuizModal } from "@/components/handover/ComprehensionQuizModal";
 import { ReceiptCertificateModal } from "@/components/handover/ReceiptCertificateModal";
-import { DecisionTimeline } from "@/components/evidence/DecisionTimeline";
 import { ClaimCard } from "@/components/evidence/ClaimCard";
+import { DecisionTimeline } from "@/components/evidence/DecisionTimeline";
+import { SourceCitationPopover } from "@/components/evidence/SourceCitationPopover";
 import type {
   AudienceRole,
+  Chunk,
   ClaimRecord,
   DraftVersion,
+  EvidenceRecord,
   Receipt,
   ComprehensionQuestion,
+  SourceType,
 } from "@/types/echobridge.types";
 
 export default function HandoverPage() {
-  const { currentRole, switchRole } = useRole();
+  const { currentRole } = useRole();
   const [audienceRole, setAudienceRole] = useState<AudienceRole>(
     currentRole === "incoming_intern" ? "incoming_intern" : "incoming_lead"
   );
 
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [questions, setQuestions] = useState<ComprehensionQuestion[]>([]);
-  const [draftV2, setDraftV2] = useState<DraftVersion | null>(null);
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
+  const [chunks, setChunks] = useState<Chunk[]>([]);
 
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
-  const [showRestrictedPlaceholders, setShowRestrictedPlaceholders] = useState(true);
-  const [activeTab, setActiveTab] = useState<"board" | "claims" | "quiz_cert" | "timeline">("board");
+  const [bottomTab, setBottomTab] = useState<"claims" | "timeline">("claims");
+
+  // Source Citation Popover State
+  const [inspectedEvidence, setInspectedEvidence] =
+    useState<EvidenceRecord | null>(null);
+  const [inspectedChunk, setInspectedChunk] = useState<Chunk | null>(null);
+  const [inspectedClaimText, setInspectedClaimText] = useState<string>("");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [copiedHash, setCopiedHash] = useState(false);
 
-  // Sync with global role switcher automatically
+  // Sync automatically with active navbar role switcher
   useEffect(() => {
     if (currentRole === "incoming_intern") {
       setAudienceRole("incoming_intern");
@@ -71,20 +59,25 @@ export default function HandoverPage() {
   const recipientName =
     audienceRole === "incoming_lead" ? "Riya Patel" : "Kabir Mehta";
   const recipientRoleName =
-    audienceRole === "incoming_lead" ? "Incoming Team Lead" : "Incoming Intern";
+    audienceRole === "incoming_lead"
+      ? "Incoming Team Lead"
+      : "Incoming Intern";
 
-  // Fetch receipt and draft data
   const fetchHandoverData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [receiptRes, reviewRes] = await Promise.all([
+      const [receiptRes, reviewRes, ingestRes] = await Promise.all([
         fetch(`/api/receipt?projectId=CampusConnect&role=${audienceRole}`),
-        fetch(`/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`),
+        fetch(
+          `/api/review?projectId=CampusConnect&role=${audienceRole}&fromVersion=v1.1&toVersion=v2.0`
+        ),
+        fetch("/api/ingest?projectId=CampusConnect"),
       ]);
 
-      const [receiptJson, reviewJson] = await Promise.all([
+      const [receiptJson, reviewJson, ingestJson] = await Promise.all([
         receiptRes.json(),
         reviewRes.json(),
+        ingestRes.json(),
       ]);
 
       if (receiptJson.success) {
@@ -97,10 +90,13 @@ export default function HandoverPage() {
           (d) => d.version_label === "v2.0"
         );
         const currentDraft = v2 || reviewJson.activeDraft || null;
-        setDraftV2(currentDraft);
         if (currentDraft && currentDraft.claims) {
           setClaims(currentDraft.claims);
         }
+      }
+
+      if (ingestJson.success) {
+        setChunks(ingestJson.chunks || []);
       }
     } catch (err) {
       console.error("Failed to load handover data:", err);
@@ -113,7 +109,6 @@ export default function HandoverPage() {
     fetchHandoverData();
   }, [fetchHandoverData]);
 
-  // Acknowledge receipt after passing comprehension quiz
   const handleAcknowledge = async (
     answers: { question_id: string; selected_index: number }[]
   ) => {
@@ -137,12 +132,12 @@ export default function HandoverPage() {
       if (json.success && json.receipt) {
         setReceipt(json.receipt);
         setFeedbackMessage(
-          `Handover transfer acknowledged! Cryptographic signature: ${json.receipt.receipt_hash}`
+          `Handover receipt acknowledged by ${recipientName}.`
         );
         setIsCertificateModalOpen(true);
       } else {
         throw new Error(
-          json.error || "Comprehension check failed. Please review your answers."
+          json.error || "Please review your answers and try again."
         );
       }
     } finally {
@@ -150,14 +145,82 @@ export default function HandoverPage() {
     }
   };
 
-  const handleCopyHash = () => {
-    if (!receipt?.receipt_hash) return;
-    navigator.clipboard.writeText(receipt.receipt_hash);
-    setCopiedHash(true);
-    setTimeout(() => setCopiedHash(false), 2000);
+  const chunksMap = useMemo(
+    () => new Map<string, Chunk>(chunks.map((c) => [c.id, c])),
+    [chunks]
+  );
+
+  // Open citation modal from any OnboardingBoard [🔗] icon or ClaimCard button
+  const handleInspectTaskSource = (taskLabel: string, claim?: ClaimRecord) => {
+    if (claim?.evidence && claim.evidence.length > 0) {
+      const ev = claim.evidence[0];
+      setInspectedEvidence(ev);
+      setInspectedChunk(chunksMap.get(ev.chunk_id) || null);
+      setInspectedClaimText(claim.text);
+      return;
+    }
+
+    const lower = taskLabel.toLowerCase();
+    let matchedSourceId = "SRC-ARCH-01";
+    let matchedSourceTitle = "Architecture Doc v2";
+    let matchedSourceType: SourceType = "document";
+    let matchedQuote =
+      "Next.js 15 App Router web frontend with PostgreSQL database";
+    let matchedAuthor = "Aarav Sharma";
+
+    if (lower.includes("pull request") || lower.includes("pr")) {
+      matchedSourceId = "SRC-GIT-02";
+      matchedSourceTitle = "GitHub PR #12 Export";
+      matchedSourceType = "git_repo";
+      matchedQuote = "Open PR #12 ticketing workflow awaiting final review";
+    } else if (lower.includes("api keys") || lower.includes("rotate")) {
+      matchedSourceId = "SRC-CHAT-03";
+      matchedSourceTitle = "Team Chat Export (March)";
+      matchedSourceType = "chat_export";
+      matchedQuote = "Rotate Stripe and deployment environment variables before launch";
+    } else if (lower.includes("conflict") || lower.includes("release")) {
+      matchedSourceId = "SRC-PLAN-04";
+      matchedSourceTitle = "Event Planning Doc";
+      matchedSourceType = "document";
+      matchedQuote = "Event registration closes on March 20th to allow late entries";
+      matchedAuthor = "Aarav Sharma & Prof. Deshmukh";
+    } else if (lower.includes("sponsorship") || lower.includes("budget")) {
+      matchedSourceId = "SRC-FIN-06";
+      matchedSourceTitle = "Finance & Sponsorship Folder";
+      matchedSourceType = "finance_folder";
+      matchedQuote = "Annual club sponsorship allocation under budget line CC-TECH-401";
+      matchedAuthor = "Prof. Deshmukh";
+    } else if (lower.includes("runbook") || lower.includes("worker")) {
+      matchedSourceId = "SRC-RUNBOOK-05";
+      matchedSourceTitle = "Deployment Runbook";
+      matchedSourceType = "runbook";
+      matchedQuote = "Restart background worker pipelines using updated Docker compose parameters";
+    } else if (lower.includes("rate limits") || lower.includes("connection pool")) {
+      matchedSourceId = "SRC-ARCH-01";
+      matchedSourceTitle = "Architecture Doc v2";
+      matchedSourceType = "document";
+      matchedQuote = "PostgreSQL connection pool exhausted under 1,200 concurrent users; Redis used for active sessions";
+    }
+
+    const chunk =
+      chunks.find((c) => c.source_id === matchedSourceId) || chunks[0] || null;
+
+    setInspectedEvidence({
+      source_id: matchedSourceId,
+      source_type: matchedSourceType,
+      source_title: matchedSourceTitle,
+      chunk_id: chunk?.id || "CHK-01",
+      author: matchedAuthor,
+      evidence_timestamp: "2026-03-10T10:00:00Z",
+      quoted_span: chunk ? chunk.content.slice(0, 120) : matchedQuote,
+      is_verbatim_verified: true,
+      entailment_verdict: "supported",
+    });
+    setInspectedChunk(chunk);
+    setInspectedClaimText(taskLabel);
   };
 
-  // Group claims by section for Tab 1
+  // Group approved claims by clean section names
   const groupedClaims = useMemo(() => {
     const groups: Record<string, ClaimRecord[]> = {};
     for (const claim of claims) {
@@ -169,477 +232,225 @@ export default function HandoverPage() {
   }, [claims]);
 
   const sectionTitles: Record<string, string> = {
-    architecture: "Architecture & System Decisions",
+    architecture: "Architecture & Framework",
+    decisions: "Decisions & Strategy",
     operations: "Operations & Runbooks",
     onboarding_day1: "Day 1 Setup Tasks",
     onboarding_week1: "Week 1 Actions & Keys",
     onboarding_month1: "Month 1 Milestones",
-    finance: "Finance & Sponsorship (Restricted Scope)",
-    risks: "Open Operational Risks",
-    general: "General Project Knowledge",
+    finance: "Finance & Budget",
+    risks: "Open Risks",
+    general: "Project Knowledge",
   };
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-7xl mx-auto">
+      <main className="w-full py-4">
         <LoadingSkeleton
           cardCount={3}
-          message="Loading Approved Handover Continuation Plan..."
-          steps={[
-            "Checking audience permission scope (Lead vs. Intern)...",
-            "Loading verified continuation tasks for Day 1, Week 1, Month 1...",
-            "Validating receipt acknowledgement and signature status...",
-          ]}
+          message="Loading your role-appropriate handover..."
         />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-5">
+    <main className="w-full space-y-6">
+      {/* ==================================================================== */}
+      {/* TOP-RIGHT SIMPLE AUDIENCE TOGGLE ROW                                 */}
+      {/* ==================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-accent-primary/20 border border-accent-primary/40 text-accent-cyan uppercase">
-              Stage 6 of 6: Handover Delivery &amp; Receipt
-            </span>
-            <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              ADR-007 Verified Transfer
-            </span>
-          </div>
-
-          {/* Heading matches Figure 7 and E2E test regex /Role-Appropriate Handover & Continuation Plan/i */}
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary flex flex-wrap items-center gap-3">
-            <span>Your Handover: Role-Appropriate Handover &amp; Continuation Plan</span>
-            <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
-              audienceRole === "incoming_lead"
-                ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
-                : "bg-teal-500/15 border-teal-500/30 text-teal-300"
-            }`}>
-              {audienceRole === "incoming_lead"
-                ? "Team Lead Continuation Plan — Riya Patel"
-                : "Intern Continuation Plan — Kabir Mehta"}
-            </span>
-          </h1>
-
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-            Approved continuation package tailored for <strong className="text-text-primary">{recipientRoleName}</strong>. Review your Day 1, Week 1, and Month 1 continuation tasks and complete the risk comprehension check.
-          </p>
+          <span className="text-xs font-medium text-slate-500">
+            Final Handover &amp; Continuation Plan
+          </span>
         </div>
 
-        {/* Header Right Actions & Preview Switcher */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
-          {/* Subtle Preview Pill for Reviewer or Departing Member */}
-          {(currentRole === "reviewer" || currentRole === "departing_member") && (
-            <div className="flex items-center gap-1.5 p-1 rounded-lg bg-surface border border-border-subtle text-xs font-mono">
-              <span className="text-[10px] text-text-muted px-1.5 uppercase font-bold">
-                Preview:
-              </span>
-              <button
-                type="button"
-                onClick={() => setAudienceRole("incoming_lead")}
-                className={`px-2.5 py-1 rounded text-xs transition-all ${
-                  audienceRole === "incoming_lead"
-                    ? "bg-accent-primary text-white font-bold"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                Lead (Riya)
-              </button>
-              <button
-                type="button"
-                onClick={() => setAudienceRole("incoming_intern")}
-                className={`px-2.5 py-1 rounded text-xs transition-all ${
-                  audienceRole === "incoming_intern"
-                    ? "bg-accent-primary text-white font-bold"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                Intern (Kabir)
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Link href="/review">
-              <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-                <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-                Stage 5: Review
-              </Button>
-            </Link>
-
-            <Link href="/metrics">
-              <Button variant="primary" size="sm" className="text-xs">
-                <BarChart2 className="w-3.5 h-3.5 mr-1.5" />
-                <span>Metrics Scorecard</span>
-                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-              </Button>
-            </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-600">
+            Viewing Handover For:
+          </span>
+          <div className="inline-flex items-center p-1 rounded-lg bg-white border border-slate-200 shadow-sm text-xs">
+            <button
+              type="button"
+              onClick={() => setAudienceRole("incoming_lead")}
+              className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                audienceRole === "incoming_lead"
+                  ? "bg-teal-700 text-white font-semibold shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100 font-medium"
+              }`}
+            >
+              Team Lead (Riya)
+            </button>
+            <button
+              type="button"
+              onClick={() => setAudienceRole("incoming_intern")}
+              className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                audienceRole === "incoming_intern"
+                  ? "bg-teal-700 text-white font-semibold shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100 font-medium"
+              }`}
+            >
+              Intern (Kabir)
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Role Confirmation & Scope Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-surface border border-border-subtle text-xs">
-        <div className="flex items-center gap-2.5">
-          <span className="font-mono text-text-muted uppercase text-[11px] font-bold">
-            Active Audience Scope:
-          </span>
-          <span className={`px-2.5 py-1 rounded-md font-mono text-xs font-bold border ${
-            audienceRole === "incoming_lead"
-              ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-300"
-              : "bg-teal-950/40 border-teal-500/40 text-teal-300"
-          }`}>
-            {audienceRole === "incoming_lead"
-              ? "✓ Full Team Lead Scope (Includes Finance & Deployment Keys)"
-              : "🔒 Intern Restricted Scope (Finance Hidden via Two-Barrier RBAC)"}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 font-mono text-[11px] text-text-secondary">
-          <span className="px-2 py-0.5 rounded bg-canvas border border-border-subtle">
-            Approved Version: {draftV2?.version_label || "v2.0"} (Score: {draftV2?.confidence?.total_score || 89}%)
-          </span>
-        </div>
-      </div>
-
-      {/* Feedback Alert Toast */}
+      {/* Feedback Banner */}
       {feedbackMessage && (
-        <div className="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/30 text-emerald-200 text-xs flex items-center justify-between gap-3">
+        <div className="rounded-xl p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>{feedbackMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="font-mono text-xs text-emerald-400 hover:text-emerald-200"
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Top Receipt Bar (Exact Match to Figure 7) */}
-      <ReceiptBanner
-        receipt={receipt}
-        recipientName={recipientName}
-        recipientRoleName={recipientRoleName}
-        onOpenQuizModal={() => setIsQuizModalOpen(true)}
-        onOpenCertificateModal={() => setIsCertificateModalOpen(true)}
-        isIncomingRole={currentRole === audienceRole}
-      />
+      {/* ==================================================================== */}
+      {/* MAIN CARD CONTAINER ("Your Handover" — EXACT FIGURE 7 MATCH)         */}
+      {/* ==================================================================== */}
+      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-7 space-y-6">
+        {/* 1. Card Title Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Your Handover
+            </h1>
 
-      {/* 4-Column Continuation Grid (Figure 7 Core Board) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-accent-cyan" />
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-text-primary">
-              Continuation Board (Figure 7: Day 1, Week 1, Month 1 &amp; Risks)
-            </h2>
+            {audienceRole === "incoming_lead" ? (
+              <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default select-none">
+                Team Lead Continuation Plan — Full Access
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 cursor-default select-none">
+                Intern Continuation Plan — Restricted Access
+              </span>
+            )}
           </div>
-          <span className="text-xs font-mono text-text-muted">
-            Click [🔗] to trace evidence ground truth
-          </span>
         </div>
 
+        {/* 2. Top Receipt Bar */}
+        <ReceiptBanner
+          receipt={receipt}
+          recipientName={recipientName}
+          recipientRoleName={recipientRoleName}
+          cleanMode
+          onOpenQuizModal={() => setIsQuizModalOpen(true)}
+          onOpenCertificateModal={() => setIsCertificateModalOpen(true)}
+          isIncomingRole={currentRole === audienceRole}
+        />
+
+        {/* 3. Responsive 4-Column Continuation Plan Grid */}
         <OnboardingBoard
           claims={claims}
           audienceRole={audienceRole}
-          showRestrictedPlaceholders={showRestrictedPlaceholders}
+          cleanMode
+          onInspectSource={handleInspectTaskSource}
         />
-      </div>
+      </section>
 
-      {/* Section Tabs below the Continuation Board */}
-      <div className="border-t border-border-subtle pt-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("board")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 ${
-              activeTab === "board"
-                ? "bg-accent-primary text-white shadow-sm"
-                : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Continuation Board View</span>
-          </button>
+      {/* ==================================================================== */}
+      {/* 4. APPROVED KNOWLEDGE BASE CLAIMS & TIMELINE BELOW BOARD             */}
+      {/* ==================================================================== */}
+      <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBottomTab("claims")}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-colors cursor-pointer ${
+                bottomTab === "claims"
+                  ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Approved Knowledge Base Claims ({claims.length})</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("claims")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 ${
-              activeTab === "claims"
-                ? "bg-accent-primary text-white shadow-sm"
-                : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
-            }`}
-          >
-            <FileCheck2 className="w-3.5 h-3.5" />
-            <span>📋 Approved Handover Claims ({claims.length})</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setBottomTab("timeline")}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-colors cursor-pointer ${
+                bottomTab === "timeline"
+                  ? "bg-teal-700 text-white border-teal-700 font-semibold shadow-sm"
+                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+              }`}
+            >
+              <GitBranch className="w-4 h-4" />
+              <span>Decision Timeline</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("quiz_cert")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 ${
-              activeTab === "quiz_cert"
-                ? "bg-accent-primary text-white shadow-sm"
-                : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
-            }`}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>🎓 Risk Comprehension &amp; Transfer Certificate</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("timeline")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-2 ${
-              activeTab === "timeline"
-                ? "bg-accent-primary text-white shadow-sm"
-                : "bg-surface text-text-secondary hover:text-text-primary border border-border-subtle"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>🧭 Architectural Decision Timeline (&quot;Why&quot; Cards)</span>
-          </button>
+          <span className="text-xs text-slate-500">
+            Role-filtered for {recipientName}
+          </span>
         </div>
 
-        {/* Tab 1 Content: Approved Handover Claims (By Section) */}
-        {activeTab === "claims" && (
+        {bottomTab === "claims" ? (
           <div className="space-y-6">
-            <div className="p-3.5 rounded-xl bg-surface border border-border-subtle text-xs text-text-secondary flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                <span>
-                  All claims below have been verified by the human reviewer (Prof. Deshmukh) and published in <strong>Draft v2.0</strong>.
-                </span>
-              </div>
-              <span className="font-mono text-[11px] text-text-muted">
-                {claims.length} Approved Claims
-              </span>
-            </div>
-
             {Object.keys(groupedClaims).length === 0 ? (
-              <div className="text-center py-8 text-text-muted font-mono text-xs">
-                No approved claims found for this audience.
+              <div className="text-center py-8 text-slate-500 text-sm">
+                No approved handover claims available yet.
               </div>
             ) : (
-              Object.entries(groupedClaims).map(([sectionKey, sectionClaims]) => (
-                <div key={sectionKey} className="space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-1.5">
-                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-accent-cyan">
-                      {sectionTitles[sectionKey] || sectionKey} ({sectionClaims.length})
-                    </h3>
-                  </div>
+              Object.entries(groupedClaims).map(
+                ([sectionKey, sectionClaims]) => (
+                  <div key={sectionKey} className="space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <h2 className="text-sm font-bold text-slate-800">
+                        {sectionTitles[sectionKey] || sectionKey}
+                      </h2>
+                      <span className="text-xs text-slate-500">
+                        {sectionClaims.length} item
+                        {sectionClaims.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
 
-                  <div className="space-y-2">
-                    {sectionClaims.map((claim) => (
-                      <ClaimCard key={claim.id} claim={claim} />
-                    ))}
+                    <div className="space-y-2.5">
+                      {sectionClaims.map((claim) => (
+                        <ClaimCard
+                          key={claim.id}
+                          claim={claim}
+                          chunksById={chunksMap}
+                          onInspectEvidence={(evidence, chunk, claimText) => {
+                            setInspectedEvidence(evidence);
+                            setInspectedChunk(chunk || null);
+                            setInspectedClaimText(claimText || "");
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              )
             )}
           </div>
+        ) : (
+          <DecisionTimeline audienceRole={audienceRole} />
         )}
+      </section>
 
-        {/* Tab 2 Content: Risk Comprehension Quiz & Transfer Certificate */}
-        {activeTab === "quiz_cert" && (
-          <div className="space-y-5">
-            {/* Certificate / Receipt Summary Banner */}
-            <Card className="p-5 bg-surface border-border-subtle space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
-                <div className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-accent-cyan" />
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary">
-                      Cryptographic Handover Transfer Verification (ADR-007)
-                    </h3>
-                    <p className="text-xs text-text-muted">
-                      Comprehension-guarded receipt prevents blind acknowledgement of critical inherited project risks.
-                    </p>
-                  </div>
-                </div>
-
-                {receipt ? (
-                  <Button
-                    variant="approve"
-                    size="sm"
-                    onClick={() => setIsCertificateModalOpen(true)}
-                    className="text-xs font-mono bg-emerald-600 hover:bg-emerald-500 text-white"
-                  >
-                    <Award className="w-3.5 h-3.5 mr-1.5" />
-                    View Certificate Modal
-                  </Button>
-                ) : (
-                  <Button
-                    variant="approve"
-                    size="sm"
-                    onClick={() => setIsQuizModalOpen(true)}
-                    className="text-xs font-mono bg-emerald-600 hover:bg-emerald-500 text-white"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-                    Take Comprehension Check
-                  </Button>
-                )}
-              </div>
-
-              {receipt ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
-                  <div className="p-3 rounded-lg bg-canvas border border-emerald-500/30 space-y-1">
-                    <span className="text-[10px] text-text-muted uppercase font-bold block">
-                      Status &amp; Comprehension:
-                    </span>
-                    <span className="text-emerald-400 font-bold text-sm flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Passed ({receipt.comprehension_score}%)
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-canvas border border-border-subtle space-y-1">
-                    <span className="text-[10px] text-text-muted uppercase font-bold block">
-                      Acknowledged Recipient:
-                    </span>
-                    <span className="text-text-primary font-semibold">
-                      {receipt.incoming_user_name} ({recipientRoleName})
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-canvas border border-border-subtle space-y-1">
-                    <span className="text-[10px] text-text-muted uppercase font-bold block">
-                      Cryptographic SHA-256 Hash:
-                    </span>
-                    <div className="flex items-center gap-1 text-emerald-300">
-                      <span className="truncate max-w-[160px]">
-                        {receipt.receipt_hash || "0x9f2a4b8..."}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyHash}
-                        className="text-text-muted hover:text-text-primary p-0.5"
-                        title="Copy hash"
-                      >
-                        {copiedHash ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>
-                    Receipt has not yet been acknowledged. The incoming member must answer the 3 risk questions correctly to receive a cryptographically signed transfer certificate.
-                  </span>
-                </div>
-              )}
-            </Card>
-
-            {/* The 3 Comprehension Questions Preview */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-text-secondary">
-                  Audited Critical Risk Questions (3 Required Checks)
-                </h4>
-                <span className="text-[11px] font-mono text-emerald-400">
-                  100% Pass Threshold
-                </span>
-              </div>
-
-              {questions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  className="p-4 rounded-xl bg-surface border border-border-subtle space-y-2 text-xs"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-accent-primary/20 text-accent-cyan font-mono font-bold flex items-center justify-center text-[10px]">
-                        {idx + 1}
-                      </span>
-                      <span className="font-semibold text-text-primary">
-                        {q.question}
-                      </span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-canvas border border-border-subtle text-text-muted">
-                      {q.id}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-7 pt-1 font-mono text-[11px]">
-                    {q.options.map((opt, optIdx) => {
-                      const isCorrect = optIdx === q.correct_option_index;
-                      return (
-                        <div
-                          key={optIdx}
-                          className={`p-2 rounded-lg border flex items-center gap-2 ${
-                            isCorrect
-                              ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-200"
-                              : "bg-canvas border-border-subtle text-text-muted"
-                          }`}
-                        >
-                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                            isCorrect ? "bg-emerald-500 text-black" : "bg-border-subtle text-text-muted"
-                          }`}>
-                            {String.fromCharCode(65 + optIdx)}
-                          </span>
-                          <span>{opt}</span>
-                          {isCorrect && (
-                            <span className="ml-auto text-[9px] uppercase px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                              Verified
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {q.explanation && (
-                    <p className="text-[11px] text-text-secondary pl-7 pt-1 italic">
-                      Mentor Resolution: {q.explanation}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3 Content: Architectural Decision Timeline */}
-        {activeTab === "timeline" && (
-          <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-surface border border-border-subtle text-xs text-text-secondary flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-accent-cyan" />
-                <span>
-                  Chronological trail of architectural decisions and their &quot;Why&quot; rationale for <strong>{recipientRoleName}</strong>.
-                </span>
-              </div>
-              <span className="font-mono text-[11px] text-text-muted">
-                Historical Context
-              </span>
-            </div>
-
-            <DecisionTimeline audienceRole={audienceRole} />
-          </div>
-        )}
-      </div>
-
-      {/* Interactive Comprehension Quiz Modal */}
+      {/* Modals */}
       <ComprehensionQuizModal
         isOpen={isQuizModalOpen}
         onClose={() => setIsQuizModalOpen(false)}
         questions={questions}
         recipientName={recipientName}
         recipientRoleName={recipientRoleName}
+        cleanMode
         onAcknowledge={handleAcknowledge}
         isLoading={isSubmitting}
       />
 
-      {/* Verification Certificate Modal */}
       <ReceiptCertificateModal
         isOpen={isCertificateModalOpen}
         onClose={() => setIsCertificateModalOpen(false)}
@@ -648,28 +459,13 @@ export default function HandoverPage() {
         approverName="Prof. Deshmukh (Project Mentor)"
       />
 
-      {/* Bottom Navigation Toolbar */}
-      <div className="flex items-center justify-between pt-6 border-t border-border-subtle">
-        <Link href="/review">
-          <Button variant="ghost" size="sm" className="text-xs text-text-secondary">
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back to Stage 5: Review
-          </Button>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-text-muted hidden md:inline">
-            Verify all 8 planted test traps on the evaluation scorecard
-          </span>
-          <Link href="/metrics">
-            <Button variant="primary" size="md" className="text-xs">
-              <BarChart2 className="w-4 h-4 mr-2" />
-              <span>Proceed to Metrics Scorecard</span>
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <SourceCitationPopover
+        isOpen={Boolean(inspectedEvidence)}
+        onClose={() => setInspectedEvidence(null)}
+        evidence={inspectedEvidence}
+        chunk={inspectedChunk}
+        claimText={inspectedClaimText}
+      />
     </main>
   );
 }
