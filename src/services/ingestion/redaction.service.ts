@@ -35,6 +35,11 @@ export function maskSecretPreview(raw: string, type: SecretType): string {
         const suffix = raw.slice(-4);
         return `${prefix}••••${suffix}`;
       }
+      if (raw.startsWith("github_pat_")) {
+        const prefix = raw.slice(0, 11);
+        const suffix = raw.slice(-4);
+        return `${prefix}••••${suffix}`;
+      }
       if (raw.startsWith("AIza") || raw.startsWith("ghp_") || raw.startsWith("gho_")) {
         const prefix = raw.slice(0, 4);
         const suffix = raw.slice(-4);
@@ -131,8 +136,8 @@ export function redactSecretsAndPII(
     });
   }
 
-  // 3. GitHub Personal Access Tokens (ghp_..., gho_...)
-  const githubRegex = /\b(gh[pousr]_[a-zA-Z0-9]{36,})\b/g;
+  // 3. GitHub Personal Access Tokens (classic gh[pousr]_... & fine-grained github_pat_...)
+  const githubRegex = /\b(gh[pousr]_[a-zA-Z0-9]{36,}|github_pat_[a-zA-Z0-9_]{20,})\b/g;
   while ((m = githubRegex.exec(text)) !== null) {
     matches.push({
       raw: m[1],

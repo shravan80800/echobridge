@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ingestSources, type RawSourceInput } from "@/services/ingestion/parser.service";
 import { reconstructAllAudienceDrafts } from "@/services/trust/generator.service";
 import {
+  checkLiveImportRateLimit,
+  extractClientRateLimitKey,
   fetchGitHubSources,
   fetchGoogleDocSource,
   LiveImportError,
@@ -26,6 +28,21 @@ interface LiveImportRequestBody {
 
 export async function POST(request: NextRequest) {
   let rawToken: string | undefined;
+
+  const clientKey = extractClientRateLimitKey(request.headers);
+  const rateLimit = checkLiveImportRateLimit(clientKey);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Too many live import requests. Please wait ${rateLimit.retryAfterSeconds} seconds and try again.`,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      }
+    );
+  }
 
   try {
     let body: LiveImportRequestBody;

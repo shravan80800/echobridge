@@ -7,8 +7,15 @@
 import crypto from "crypto";
 import type { RawSourceInput } from "@/services/ingestion/parser.service";
 
-const MAX_CONTENT_CHARS = 50_000;
+const MAX_URL_LENGTH = 2_048;
+const MAX_TOKEN_LENGTH = 512;
+const MAX_CONTENT_CHARS = 100_000;
+const MAX_UPSTREAM_BYTES = 2 * 1024 * 1024; // 2 MB cap per upstream response
 const FETCH_TIMEOUT_MS = 15_000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+
+const rateLimitBuckets = new Map<string, number[]>();
 
 export class LiveImportError extends Error {
   public readonly status: number;
@@ -18,6 +25,104 @@ export class LiveImportError extends Error {
     this.name = "LiveImportError";
     this.status = status;
   }
+}
+
+/**
+ * Sliding-window per-client rate limiter for `/api/live-import`.
+ */
+export function checkLiveImportRateLimit(
+  clientKey: string,
+  nowMs = Date.now()
+): { allowed: boolean; retryAfterSeconds: number } {
+  const cutoff = nowMs - RATE_LIMIT_WINDOW_MS;
+  const existing = rateLimitBuckets.get(clientKey) || [];
+  const active = existing.filter((ts) => ts > cutoff);
+
+  if (active.length >= RATE_LIMIT_MAX_REQUESTS) {
+    const oldestActive = active[0];
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((oldestActive + RATE_LIMIT_WINDOW_MS - nowMs) / 1000)
+    );
+    rateLimitBuckets.set(clientKey, active);
+    return { allowed: false, retryAfterSeconds };
+  }
+
+  active.push(nowMs);
+  rateLimitBuckets.set(clientKey, active);
+
+  // Prune stale buckets periodically so map stays bounded
+  if (rateLimitBuckets.size > 1_000) {
+    for (const [key, timestamps] of rateLimitBuckets.entries()) {
+      const recent = timestamps.filter((ts) => ts > cutoff);
+      if (recent.length === 0) {
+        rateLimitBuckets.delete(key);
+      } else {
+        rateLimitBuckets.set(key, recent);
+      }
+    }
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function resetLiveImportRateLimits(): void {
+  rateLimitBuckets.clear();
+}
+
+export function extractClientRateLimitKey(headers: Headers): string {
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+  const realIp = headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  return "local";
+}
+
+function validateOptionalToken(token?: string): string | undefined {
+  const clean = token?.trim();
+  if (!clean) return undefined;
+  if (clean.length > MAX_TOKEN_LENGTH) {
+    throw new LiveImportError(
+      `Access token exceeds maximum allowed length (${MAX_TOKEN_LENGTH} characters).`,
+      400
+    );
+  }
+  return clean;
+}
+
+function assertWithinUpstreamSizeLimit(res: Response, sourceLabel: string): void {
+  const contentLengthHeader = res.headers?.get("content-length");
+  if (!contentLengthHeader) return;
+  const contentLength = Number(contentLengthHeader);
+  if (Number.isFinite(contentLength) && contentLength > MAX_UPSTREAM_BYTES) {
+    throw new LiveImportError(
+      `${sourceLabel} is too large to import safely (exceeds 2 MB limit).`,
+      413
+    );
+  }
+}
+
+function isAllowedGoogleHost(responseUrl: string): boolean {
+  if (!responseUrl) return true; // Allows unit-test Response mocks without URL metadata
+  try {
+    const parsed = new URL(responseUrl);
+    const host = parsed.hostname.toLowerCase();
+    return host === "docs.google.com" || host.endsWith(".googleusercontent.com");
+  } catch {
+    return false;
+  }
+}
+
+function formatGitHubRateLimitWait(resetHeader: string | null): string {
+  if (!resetHeader) return "a few minutes";
+  const resetEpochSec = Number(resetHeader);
+  if (!Number.isFinite(resetEpochSec)) return "a few minutes";
+  const diffSeconds = Math.max(1, Math.ceil(resetEpochSec - Date.now() / 1000));
+  if (diffSeconds < 60) return `~${diffSeconds}s`;
+  return `~${Math.ceil(diffSeconds / 60)} min`;
 }
 
 /**
@@ -54,6 +159,12 @@ export function parseGitHubRepoUrl(rawUrl: string): { owner: string; repo: strin
   const trimmed = rawUrl.trim();
   if (!trimmed) {
     throw new LiveImportError("Invalid GitHub URL. Expected: https://github.com/owner/repo", 400);
+  }
+  if (trimmed.length > MAX_URL_LENGTH) {
+    throw new LiveImportError(
+      `URL exceeds maximum allowed length (${MAX_URL_LENGTH} characters).`,
+      400
+    );
   }
 
   let owner = "";
@@ -116,6 +227,12 @@ export function parseGoogleDocUrl(rawUrl: string): { docId: string } {
   if (!trimmed) {
     throw new LiveImportError("Invalid Google Doc URL.", 400);
   }
+  if (trimmed.length > MAX_URL_LENGTH) {
+    throw new LiveImportError(
+      `URL exceeds maximum allowed length (${MAX_URL_LENGTH} characters).`,
+      400
+    );
+  }
 
   const normalized = /^docs\.google\.com\//i.test(trimmed)
     ? `https://${trimmed}`
@@ -173,7 +290,10 @@ export async function fetchGitHubSources(
   token?: string
 ): Promise<{ sources: RawSourceInput[]; repoFullName: string }> {
   const { owner, repo } = parseGitHubRepoUrl(url);
-  const authToken = token?.trim() || process.env.GITHUB_DEFAULT_PAT?.trim() || undefined;
+  const authToken =
+    validateOptionalToken(token) ||
+    validateOptionalToken(process.env.GITHUB_DEFAULT_PAT) ||
+    undefined;
 
   const headers: Record<string, string> = {
     "User-Agent": "EchoBridge/1.0",
@@ -213,8 +333,23 @@ export async function fetchGitHubSources(
 
   const [readmeRes, commitsRes, issuesRes, pullsRes] = responses;
 
-  // Fail immediately on auth, rate limit, or server errors across any endpoint
+  // Fail immediately on rate limits, auth failures, oversized responses, or server errors
   for (const res of responses) {
+    assertWithinUpstreamSizeLimit(res, "GitHub API response");
+
+    if (
+      res.status === 429 ||
+      (res.status === 403 && res.headers?.get("x-ratelimit-remaining") === "0")
+    ) {
+      const waitHint = formatGitHubRateLimitWait(
+        res.headers?.get("x-ratelimit-reset") ?? null
+      );
+      throw new LiveImportError(
+        `GitHub API rate limit exceeded (${res.status}). Retry in ${waitHint} or provide a Personal Access Token for higher limits.`,
+        429
+      );
+    }
+
     if (res.status === 401 || res.status === 403 || res.status >= 500) {
       throw new LiveImportError(
         `GitHub fetch failed: ${res.status} ${res.statusText}. For private repos, provide a Personal Access Token.`,
@@ -350,24 +485,32 @@ export async function fetchGoogleDocSource(
   token?: string
 ): Promise<RawSourceInput> {
   const { docId } = parseGoogleDocUrl(url);
+  const cleanToken = validateOptionalToken(token);
   const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
 
   let res: Response;
   try {
     res = await fetch(exportUrl, {
       cache: "no-store",
+      redirect: "follow",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : "Network error";
     throw new LiveImportError(
-      `Could not fetch Google Doc (${stripSecretToken(reason, token)}). Make sure sharing is set to 'Anyone with the link'.`,
+      `Could not fetch Google Doc (${stripSecretToken(reason, cleanToken)}). Make sure sharing is set to 'Anyone with the link'.`,
       502
     );
   }
 
-  const contentType = (res.headers.get("content-type") || "").toLowerCase();
-  if (!res.ok || res.url.includes("accounts.google.com") || contentType.includes("text/html")) {
+  assertWithinUpstreamSizeLimit(res, "Google Doc");
+
+  const contentType = (res.headers?.get("content-type") || "").toLowerCase();
+  if (
+    !res.ok ||
+    !isAllowedGoogleHost(res.url || "") ||
+    contentType.includes("text/html")
+  ) {
     throw new LiveImportError(
       "Could not fetch Google Doc. Make sure sharing is set to 'Anyone with the link'.",
       res.ok ? 403 : res.status
@@ -375,7 +518,10 @@ export async function fetchGoogleDocSource(
   }
 
   const rawText = await res.text();
-  const cleanedText = stripSecretToken(rawText.replace(/^\uFEFF/, "").trim(), token);
+  const cleanedText = stripSecretToken(
+    rawText.replace(/^\uFEFF/, "").trim(),
+    cleanToken
+  );
 
   if (!cleanedText) {
     throw new LiveImportError(
