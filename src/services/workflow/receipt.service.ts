@@ -20,6 +20,7 @@ import { repository } from "@/lib/supabase/repository";
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { CAMPUS_CONNECT_COMPREHENSION_QUESTIONS } from "@/services/seed/campus-connect.seed";
 import { buildDraftVersionId, getProjectTag } from "@/utils/project-scope";
+import { analyzeWorkspaceSources } from "@/utils/repo-analysis";
 
 export interface QuizEvaluationResult {
   totalQuestions: number;
@@ -52,6 +53,12 @@ export class ComprehensionQuizFailedError extends Error {
 /**
  * Retrieves the comprehension quiz questions for project onboarding.
  */
+function clipQuizText(value: string, maxLen = 115): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return `${clean.slice(0, maxLen - 3).trimEnd()}...`;
+}
+
 export async function getComprehensionQuestions(
   projectId = "CampusConnect",
   audienceRole: AudienceRole = "incoming_lead"
@@ -60,71 +67,146 @@ export async function getComprehensionQuestions(
     return CAMPUS_CONNECT_COMPREHENSION_QUESTIONS;
   }
 
-  const [project, sources, v20, v11, v10] = await Promise.all([
-    repository.getProject(projectId),
-    repository.listSources(projectId),
-    repository.getDraftVersion(projectId, audienceRole, "v2.0"),
-    repository.getDraftVersion(projectId, audienceRole, "v1.1"),
-    repository.getDraftVersion(projectId, audienceRole, "v1.0"),
-  ]);
+  const [project, sources, chunks, gapQuestions, v20, v11, v10] =
+    await Promise.all([
+      repository.getProject(projectId),
+      repository.listSources(projectId),
+      repository.listChunks(projectId),
+      repository.listGapQuestions(projectId),
+      repository.getDraftVersion(projectId, audienceRole, "v2.0"),
+      repository.getDraftVersion(projectId, audienceRole, "v1.1"),
+      repository.getDraftVersion(projectId, audienceRole, "v1.0"),
+    ]);
 
   const draft = v20 || v11 || v10;
   const claims = draft?.claims || [];
-  if (sources.length === 0 && claims.length === 0) {
-    return CAMPUS_CONNECT_COMPREHENSION_QUESTIONS;
-  }
-
   const projectName = project?.name || projectId;
   const tag = getProjectTag(projectId);
+
+  const analysis = analyzeWorkspaceSources(sources, chunks);
   const primarySource = sources[0];
-  const secondarySource = sources[1] || primarySource;
-  const primaryClaim = claims[0];
-  const claimSnippet = primaryClaim?.text
-    ? primaryClaim.text.length > 110
-      ? `${primaryClaim.text.slice(0, 107).trimEnd()}...`
-      : primaryClaim.text
-    : `Verified source artifacts from ${primarySource?.title || projectName} were indexed with verbatim citation tracking.`;
+  const archClaim =
+    claims.find((c) => c.section === "architecture") || claims[0];
+  const riskOrTaskClaim =
+    claims.find(
+      (c) =>
+        (c.section === "tasks_dependencies" ||
+          c.section === "onboarding_week1" ||
+          c.claim_type === "risk") &&
+        c.evidence.length > 0
+    ) || claims[1] || claims[0];
+
+  const stackSummary =
+    analysis.techStack.length > 0
+      ? analysis.techStack.slice(0, 4).join(", ")
+      : "";
+  const readmeHighlight =
+    analysis.readmeSummaryLine ||
+    analysis.docSummaryLine ||
+    archClaim?.text ||
+    `Verified artifacts from ${primarySource?.title || projectName}`;
+  const q1CorrectOption = stackSummary
+    ? clipQuizText(`${stackSummary} — ${readmeHighlight}`)
+    : clipQuizText(
+        primarySource
+          ? `${primarySource.title}: ${readmeHighlight}`
+          : `${projectName}: ${readmeHighlight}`
+      );
+
+  const issueFocus =
+    analysis.issueLines.length > 0
+      ? analysis.issueLines.slice(0, 2).join("; ")
+      : analysis.prLines.length > 0
+      ? analysis.prLines.slice(0, 2).join("; ")
+      : "";
+  const commitFocus =
+    analysis.commitLines.length > 0
+      ? analysis.commitLines.slice(0, 2).join("; ")
+      : "";
+
+  const q2Question = issueFocus
+    ? `Which active issue or pull request in ${projectName} requires incoming team attention?`
+    : commitFocus
+    ? `Which recent commit stream reflects the active implementation focus in ${projectName}?`
+    : `Which priority claim or continuity detail was verified for ${projectName}?`;
+  const q2CorrectOption = issueFocus
+    ? clipQuizText(`${issueFocus} (${analysis.issuesTitle || analysis.pullsTitle || "Open Backlog"})`)
+    : commitFocus
+    ? clipQuizText(`${commitFocus} (${analysis.commitsTitle || "Recent Commits"})`)
+    : clipQuizText(
+        riskOrTaskClaim?.text ||
+          `Follow verified onboarding & backlog steps tracked in ${projectName}.`
+      );
+  const q2Explanation = issueFocus
+    ? `Derived from ${analysis.issuesTitle || analysis.pullsTitle || projectName}: active open work (${clipQuizText(issueFocus, 90)}) must be triaged in week one.`
+    : commitFocus
+    ? `Derived from ${analysis.commitsTitle || projectName}: recent commits anchor current development continuity.`
+    : `Grounded in ${projectName}'s verified source claims.`;
+
+  const answeredGap = gapQuestions.find(
+    (q) => q.status === "answered" && !!q.answer_text
+  );
+  const q3Question = answeredGap
+    ? `According to the attested handover context for ${projectName}, what operational guidance applies to "${clipQuizText(answeredGap.question_text, 85)}"?`
+    : `How does EchoBridge safeguard secrets and unsafe prompt instructions discovered inside ${projectName} sources?`;
+  const q3CorrectOption = answeredGap
+    ? clipQuizText(
+        `${answeredGap.answered_by || "Maintainer"}: ${answeredGap.answer_text}`
+      )
+    : "Quarantines detected secrets/tokens pre-embedding and strips prompt injections before synthesis";
+  const q3Options = answeredGap
+    ? [
+        q3CorrectOption,
+        `Ignore documented team decisions and deploy ${projectName} without environment verification`,
+        "Auto-delete all handover history and open issues before onboarding",
+      ]
+    : [
+        "Leaves raw tokens inside the draft so incoming owners can copy them",
+        q3CorrectOption,
+        `Deletes all ${projectName} documentation instead of redacting sensitive lines`,
+      ];
+  const q3Explanation = answeredGap
+    ? `Attested during ${projectName}'s Stage 4 Gap-Interview by ${answeredGap.answered_by || "the departing maintainer"}.`
+    : `Every chunk from ${projectName} passed through secret redaction and prompt-injection stripping before handover generation.`;
 
   return [
     {
       id: `${tag}QUIZ-01`,
-      question: `Which primary imported source establishes the project context for ${projectName}?`,
+      question: stackSummary
+        ? `Which core stack and architecture is documented for ${projectName}?`
+        : `Which primary source and overview anchors the architecture of ${projectName}?`,
       options: [
-        primarySource
-          ? `${primarySource.title} (Author: ${primarySource.author})`
-          : `${projectName} verified project repository sources`,
+        q1CorrectOption,
         "Unverified personal scratchpad outside the repository",
-        "Legacy hardcoded demo template unrelated to this project",
+        `Legacy unrelated template external to ${projectName}`,
       ],
       correct_option_index: 0,
       explanation: `EchoBridge indexed ${sources.length} source${
         sources.length === 1 ? "" : "s"
-      } for ${projectName}, anchored by "${primarySource?.title || projectName}".`,
-      related_risk_claim_id: primaryClaim?.id,
+      } for ${projectName}${stackSummary ? ` (${stackSummary})` : ""}, anchored by "${
+        analysis.readmeTitle || primarySource?.title || projectName
+      }".`,
+      related_risk_claim_id: archClaim?.id,
     },
     {
       id: `${tag}QUIZ-02`,
-      question: `How does EchoBridge safeguard secrets and unsafe prompt instructions discovered inside ${projectName} sources?`,
+      question: q2Question,
       options: [
-        "Leaves raw tokens inside the draft so incoming owners can copy them",
-        "Quarantines detected secrets/tokens pre-embedding and strips prompt injections before synthesis",
-        "Deletes the entire repository instead of redacting sensitive lines",
+        q2CorrectOption,
+        `All ${projectName} issues and PRs are automatically closed with zero maintainer review`,
+        `${projectName} requires no week-one triage or code review`,
       ],
-      correct_option_index: 1,
-      explanation: `Every chunk from ${projectName} passed through secret redaction and prompt-injection stripping before handover generation.`,
-      related_risk_claim_id: claims[1]?.id || primaryClaim?.id,
+      correct_option_index: 0,
+      explanation: q2Explanation,
+      related_risk_claim_id: riskOrTaskClaim?.id || archClaim?.id,
     },
     {
       id: `${tag}QUIZ-03`,
-      question: `Which verified claim or continuity fact was extracted from ${secondarySource?.title || projectName}?`,
-      options: [
-        claimSnippet,
-        `${projectName} requires zero documentation review or handover verification`,
-        "All pending operational risks and dependencies are automatically marked resolved without review",
-      ],
-      correct_option_index: 0,
-      explanation: `This claim is grounded in ${secondarySource?.title || projectName} and verified via verbatim span citation.`,
-      related_risk_claim_id: primaryClaim?.id,
+      question: q3Question,
+      options: q3Options,
+      correct_option_index: answeredGap ? 0 : 1,
+      explanation: q3Explanation,
+      related_risk_claim_id: answeredGap?.claim_id || claims[2]?.id || archClaim?.id,
     },
   ];
 }

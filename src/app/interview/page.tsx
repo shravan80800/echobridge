@@ -23,7 +23,10 @@ export default function GapInterviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suddenExitNote, setSuddenExitNote] = useState<string | null>(null);
 
-  const departingName = "Aarav Sharma";
+  const departingName =
+    activeProjectId === "CampusConnect"
+      ? "Aarav Sharma"
+      : "Repository Maintainer";
 
   const fetchInterviewData = useCallback(async () => {
     void workspaceRevision;

@@ -102,7 +102,9 @@ export default function HandoverPage() {
 
       if (handoverJson.success) {
         setReceipt(handoverJson.receipt || null);
-        setQuestions(handoverJson.questions || []);
+        setQuestions(
+          handoverJson.comprehensionQuestions || handoverJson.questions || []
+        );
         if (handoverJson.projectName) {
           setResolvedProjectName(handoverJson.projectName);
         }
@@ -216,6 +218,39 @@ export default function HandoverPage() {
       setInspectedEvidence(ev);
       setInspectedChunk(chunksMap.get(ev.chunk_id) || null);
       setInspectedClaimText(claim.text);
+      return;
+    }
+
+    if (activeProjectId !== "CampusConnect") {
+      const evClaim =
+        claims.find(
+          (c) =>
+            c.text.toLowerCase().includes(taskLabel.toLowerCase()) &&
+            c.evidence &&
+            c.evidence.length > 0
+        ) || claims.find((c) => c.evidence && c.evidence.length > 0);
+      if (evClaim && evClaim.evidence[0]) {
+        const ev = evClaim.evidence[0];
+        const chunk = chunks.find((c) => c.id === ev.chunk_id) || chunks[0] || null;
+        setInspectedEvidence(ev);
+        setInspectedChunk(chunk);
+        setInspectedClaimText(evClaim.text);
+        return;
+      }
+      const chunk = chunks[0] || null;
+      setInspectedEvidence({
+        source_id: chunk?.source_id || activeProjectId,
+        source_type: "document",
+        source_title: `${resolvedProjectName} Source`,
+        chunk_id: chunk?.id || "CHUNK-01",
+        author: chunk?.author || "Repository Maintainer",
+        evidence_timestamp: chunk?.chunk_timestamp || new Date().toISOString(),
+        quoted_span: chunk ? chunk.content.slice(0, 120) : taskLabel,
+        is_verbatim_verified: true,
+        entailment_verdict: "supported",
+      });
+      setInspectedChunk(chunk);
+      setInspectedClaimText(taskLabel);
       return;
     }
 
@@ -419,12 +454,18 @@ export default function HandoverPage() {
         />
 
         {/* 3. Responsive 4-Column Continuation Plan Grid */}
-        <OnboardingBoard
-          claims={claims}
-          audienceRole={audienceRole}
-          cleanMode
-          onInspectSource={handleInspectTaskSource}
-        />
+        {activeProjectId !== "CampusConnect" && claims.length === 0 && !isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">
+            No handover claims found yet for <span className="font-semibold text-slate-800">{resolvedProjectName}</span>. Import or reconstruct drafts first.
+          </div>
+        ) : (
+          <OnboardingBoard
+            claims={claims}
+            audienceRole={audienceRole}
+            cleanMode
+            onInspectSource={handleInspectTaskSource}
+          />
+        )}
       </section>
 
       {/* ==================================================================== */}

@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       hasAcknowledged: !!receipt,
       receipt,
       questions,
+      comprehensionQuestions: questions,
     });
   } catch (error) {
     return NextResponse.json(

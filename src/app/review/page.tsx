@@ -924,26 +924,48 @@ export default function ReviewPage() {
                       <span className="text-sm font-bold text-slate-900">
                         Diff View ({fromVersion} → {toVersion})
                       </span>
-                      <span className="text-xs font-semibold text-emerald-700">
-                        +8% Confidence (76% → 84%)
-                      </span>
+                      {activeProjectId === "CampusConnect" ? (
+                        <span className="text-xs font-semibold text-emerald-700">
+                          +8% Confidence (76% → 84%)
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-emerald-700">
+                          {visibleClaims.filter((c) => c.evidence_state === "attested").length} Attested ·{" "}
+                          {visibleClaims.filter((c) => c.evidence_state === "corroborated").length} Corroborated
+                        </span>
+                      )}
                     </div>
 
-                    <div className="space-y-2 text-xs">
-                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900">
-                        <span className="font-semibold">- Old:</span> Rationale
-                        missing for Redis session cache
+                    {activeProjectId === "CampusConnect" ? (
+                      <div className="space-y-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900">
+                          <span className="font-semibold">- Old:</span> Rationale
+                          missing for Redis session cache
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                          <span className="font-semibold">+ New:</span> Redis
+                          chosen due to PostgreSQL 1,200 concurrent user limit
+                          (Attested)
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-900">
+                          ⚡ Registration date differs: March 15 (Chat) vs. March
+                          20 (Planning Doc)
+                        </div>
                       </div>
-                      <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
-                        <span className="font-semibold">+ New:</span> Redis
-                        chosen due to PostgreSQL 1,200 concurrent user limit
-                        (Attested)
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                          <span className="font-semibold">Verified in {activeVersionLabel}:</span>{" "}
+                          {visibleClaims.filter((c) => c.evidence_state === "attested").length} attested gap answer(s) &amp;{" "}
+                          {visibleClaims.filter((c) => c.evidence_state === "corroborated" || c.evidence_state === "single_source").length}{" "}
+                          source-grounded claim(s).
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                          <span className="font-semibold">Open Review Queue:</span>{" "}
+                          {visibleClaims.filter((c) => c.review.status === "pending").length} claim(s) awaiting maintainer sign-off ({visibleClaims.filter((c) => c.evidence_state === "unsupported").length} remaining gap(s)).
+                        </div>
                       </div>
-                      <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-900">
-                        ⚡ Registration date differs: March 15 (Chat) vs. March
-                        20 (Planning Doc)
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 

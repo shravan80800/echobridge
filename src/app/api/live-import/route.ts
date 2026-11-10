@@ -9,7 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { repository } from "@/lib/supabase/repository";
 import { ingestSources, type RawSourceInput } from "@/services/ingestion/parser.service";
 import { reconstructAllAudienceDrafts } from "@/services/trust/generator.service";
-import { getOrGenerateGapQuestions } from "@/services/workflow/interview.service";
+import {
+  appendGapQuestionForLiveImport,
+  getOrGenerateGapQuestions,
+} from "@/services/workflow/interview.service";
 import { ensureCustomDraftVersionsInitialized } from "@/services/workflow/review.service";
 import {
   checkLiveImportRateLimit,
@@ -94,6 +97,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Resolve target workspace & register Project when creating or using a custom workspace
+    const importedMeta =
+      importType === "github"
+        ? resolveGitHubWorkspaceMeta(url, titleOverride)
+        : resolveGoogleDocWorkspaceMeta(url, titleOverride);
+
     let targetProjectId =
       typeof body.projectId === "string" && body.projectId.trim()
         ? body.projectId.trim()
@@ -101,17 +109,13 @@ export async function POST(request: NextRequest) {
     let targetProjectName = targetProjectId;
 
     if (mode === "new_workspace") {
-      const meta =
-        importType === "github"
-          ? resolveGitHubWorkspaceMeta(url, titleOverride)
-          : resolveGoogleDocWorkspaceMeta(url, titleOverride);
-      targetProjectId = meta.projectId;
-      targetProjectName = meta.projectName;
+      targetProjectId = importedMeta.projectId;
+      targetProjectName = importedMeta.projectName;
 
       await repository.createOrUpdateProject({
-        id: meta.projectId,
-        name: meta.projectName,
-        description: meta.description,
+        id: importedMeta.projectId,
+        name: importedMeta.projectName,
+        description: importedMeta.description,
         freshness_threshold_days: 180,
         created_at: new Date().toISOString(),
       });
@@ -138,10 +142,29 @@ export async function POST(request: NextRequest) {
     const summary = await ingestSources(sources, targetProjectId);
     await reconstructAllAudienceDrafts(targetProjectId);
 
-    // 4. For custom isolated workspaces, initialize v1.1/v2.0 snapshots and dynamic Gap-Interview questions
+    const ingestedSourceIds = sources
+      .map((s) => s.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    // 4. Initialize v1.1/v2.0 snapshots & synthesize or append Gap-Interview questions
     if (targetProjectId !== "CampusConnect") {
       await ensureCustomDraftVersionsInitialized(targetProjectId);
-      await getOrGenerateGapQuestions(targetProjectId, "incoming_lead");
+      const existingGapQuestions = await repository.listGapQuestions(targetProjectId);
+      if (existingGapQuestions.length === 0) {
+        await getOrGenerateGapQuestions(targetProjectId, "incoming_lead");
+      } else if (mode === "append") {
+        await appendGapQuestionForLiveImport({
+          projectId: targetProjectId,
+          importedLabel: importedMeta.projectName,
+          sourceIds: ingestedSourceIds,
+        });
+      }
+    } else if (mode === "append") {
+      await appendGapQuestionForLiveImport({
+        projectId: targetProjectId,
+        importedLabel: importedMeta.projectName,
+        sourceIds: ingestedSourceIds,
+      });
     }
 
     const projectRecord = await repository.getProject(targetProjectId);

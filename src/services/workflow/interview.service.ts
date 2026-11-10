@@ -19,7 +19,12 @@ import { computeConfidenceBreakdown } from "@/services/trust/confidence.service"
 import { logAuditEvent } from "@/services/workflow/audit.service";
 import { getCampusConnectSeedData } from "@/services/seed/campus-connect.seed";
 import { getGeminiClient } from "@/lib/gemini/client";
-import { buildDraftVersionId, buildScopedGapId } from "@/utils/project-scope";
+import {
+  buildDraftVersionId,
+  buildScopedGapId,
+  getProjectTag,
+} from "@/utils/project-scope";
+import { analyzeWorkspaceSources } from "@/utils/repo-analysis";
 
 export interface GapInterviewProgress {
   totalQuestions: number;
@@ -94,9 +99,10 @@ function matchesGapQuestionClaim(
 export async function synthesizeDynamicGapQuestions(
   projectId: string
 ): Promise<GapQuestion[]> {
-  const [project, sources, v10Lead] = await Promise.all([
+  const [project, sources, chunks, v10Lead] = await Promise.all([
     repository.getProject(projectId),
     repository.listSources(projectId),
+    repository.listChunks(projectId),
     repository.getDraftVersion(projectId, "incoming_lead", "v1.0"),
   ]);
 
@@ -106,74 +112,102 @@ export async function synthesizeDynamicGapQuestions(
     return [];
   }
 
-  const readmeSource =
-    sources.find(
-      (s) => s.title.startsWith("README:") || s.title.startsWith("Google Doc:")
-    ) || sources[0];
-  const issuesSource = sources.find(
-    (s) =>
-      s.title.startsWith("Open Issues:") ||
-      s.title.startsWith("Open Pull Requests:")
-  );
-  const commitsSource = sources.find((s) =>
-    s.title.startsWith("Recent Commits:")
-  );
+  const analysis = analyzeWorkspaceSources(sources, chunks);
 
-  const pickClaimForSource = (
-    preferredSourceId?: string,
+  const pickClaimForGap = (
+    gapSuffix: string,
+    preferredTitlePrefix?: string,
     fallbackIndex = 0
   ): ClaimRecord | undefined => {
-    if (preferredSourceId) {
-      const fromSrc = claims.find((c) =>
-        (c.evidence || []).some((e) => e.source_id === preferredSourceId)
+    const byGap = claims.find((c) => c.id.endsWith(gapSuffix));
+    if (byGap) return byGap;
+
+    if (preferredTitlePrefix) {
+      const fromTitle = claims.find((c) =>
+        (c.evidence || []).some((e) =>
+          (e.source_title || "").startsWith(preferredTitlePrefix)
+        )
       );
-      if (fromSrc) return fromSrc;
+      if (fromTitle) return fromTitle;
     }
     return claims[fallbackIndex] || claims[0];
   };
 
-  const claim1 = pickClaimForSource(readmeSource?.id, 0);
-  const claim2 = pickClaimForSource(issuesSource?.id, 1);
-  const claim3 = pickClaimForSource(commitsSource?.id, 2);
+  const claim1 = pickClaimForGap("-GAP-1", "README:", 0);
+  const claim2 = pickClaimForGap("-GAP-2", "Open Issues:", 1);
+  const claim3 = pickClaimForGap("-GAP-3", "Recent Commits:", 2);
+
+  const stackText =
+    analysis.techStack.length > 0
+      ? analysis.techStack.slice(0, 4).join(", ")
+      : analysis.readmeTitle || analysis.docTitle || projectName;
+  const readmeHint =
+    analysis.readmeSummaryLine ||
+    analysis.docSummaryLine ||
+    claim1?.text ||
+    `Core codebase structure documented for ${projectName}.`;
+
+  const issueOrCommitItems =
+    analysis.issueLines.length > 0
+      ? analysis.issueLines.slice(0, 2)
+      : analysis.prLines.length > 0
+      ? analysis.prLines.slice(0, 2)
+      : analysis.commitLines.slice(0, 2);
+  const issueOrCommitFocus = issueOrCommitItems.join("; ");
+
+  const hasIssuesOrPrs =
+    analysis.issueLines.length > 0 || analysis.prLines.length > 0;
+  const q2QuestionText = hasIssuesOrPrs
+    ? `Regarding active items in ${projectName} (${issueOrCommitFocus}), which open issues or pull requests are top week-one priority and who signs off?`
+    : issueOrCommitFocus
+    ? `Following recent commits in ${projectName} (${issueOrCommitFocus}), which unfinished tasks, edge cases, or branches need immediate week-one attention?`
+    : `Which unresolved tasks, edge cases, or stakeholder sign-offs in ${projectName} need immediate week-one attention?`;
+
+  const q2ContextSource =
+    analysis.issuesTitle ||
+    analysis.pullsTitle ||
+    analysis.commitsTitle ||
+    projectName;
+  const q2ContextSummary = issueOrCommitFocus
+    ? `Derived from ${q2ContextSource}: "${issueOrCommitFocus}" — week-one triage order & sign-off owner are undocumented.`
+    : claim2?.text ||
+      `Derived from ${q2ContextSource} — ownership & priority rationale needs confirmation.`;
+
+  const contributorsNote =
+    analysis.contributors.length > 0
+      ? `Observed contributors: ${analysis.contributors.slice(0, 3).join(", ")}. `
+      : "";
 
   let questionTexts = [
     {
-      question_text: `Why was the core architecture and stack in ${readmeSource?.title || projectName} chosen, and what design trade-offs should the incoming owner preserve?`,
-      context_summary:
-        claim1?.text ||
-        `Derived from ${readmeSource?.title || projectName} — architectural rationale is undocumented in source files.`,
+      question_text: `Why was ${stackText} chosen for ${projectName}, and which architectural constraints or trade-offs should new maintainers preserve?`,
+      context_summary: `Grounded in ${analysis.readmeTitle || analysis.docTitle || projectName}: "${readmeHint}" — core design rationale is missing from source files.`,
     },
     {
-      question_text: issuesSource
-        ? `Which items tracked in ${issuesSource.title} are highest priority for week-one continuity in ${projectName}, and who owns follow-up decisions?`
-        : `Which unresolved tasks, edge cases, or stakeholder sign-offs in ${projectName} need immediate week-one attention?`,
-      context_summary:
-        claim2?.text ||
-        `Derived from ${issuesSource?.title || projectName} — ownership & priority rationale needs confirmation.`,
+      question_text: q2QuestionText,
+      context_summary: q2ContextSummary,
     },
     {
-      question_text: `Where are runtime secrets, deployment credentials, and rollback checks managed for ${projectName}, and are there unwritten operational steps?`,
-      context_summary:
-        claim3?.text ||
-        `Derived from ${commitsSource?.title || projectName} — operational deployment & secret handover verification.`,
+      question_text: `Where are environment variables, runtime secrets, deployment triggers, and rollback runbooks managed for ${projectName}, and who owns production access?`,
+      context_summary: `${contributorsNote}Confirm secret storage, CI/CD deployment steps, and production escalation owner for ${projectName}.`,
     },
   ];
 
-  // Optional Gemini refinement when configured (keeps deterministic structure on failure/offline)
+  // Optional Gemini refinement when configured (preserves project-specific entities)
   const gemini = getGeminiClient();
   if (gemini && claims.length > 0) {
     try {
       const summaryContext = claims
-        .slice(0, 6)
+        .slice(0, 8)
         .map((c, idx) => `${idx + 1}. [${c.section}] ${c.text}`)
         .join("\n");
       const prompt = `You are EchoBridge's Gap-Interview Designer for project "${projectName}".
 Based on these extracted claims from the repository/document:
 ${summaryContext}
 
-Generate exactly 3 concise tacit-knowledge handover questions asking what is NOT written in the docs:
-1) Architecture & design trade-off rationale
-2) Open issues / PR priorities & stakeholder ownership
+Generate exactly 3 concise tacit-knowledge handover questions asking what is NOT written in the docs, explicitly naming "${projectName}" and real details (${stackText}${issueOrCommitFocus ? `; ${issueOrCommitFocus}` : ""}):
+1) Architecture & tech-stack trade-off rationale
+2) Open issues / PR or recent commit priorities & stakeholder ownership
 3) Deployment credentials, environment variables & rollback runbook
 
 Return JSON: { "questions": [{ "question_text": "...", "context_summary": "..." }] } (exact 3 items).`;
@@ -205,7 +239,15 @@ Return JSON: { "questions": [{ "question_text": "...", "context_summary": "..." 
               context_summary: string;
             } => x !== null
           );
-        if (refined.length === 3) {
+        const repoLeaf = projectName.includes("/")
+          ? projectName.split("/")[1]
+          : projectName;
+        if (
+          refined.length === 3 &&
+          refined.every((r: { question_text: string }) =>
+            r.question_text.toLowerCase().includes(repoLeaf.toLowerCase())
+          )
+        ) {
           questionTexts = refined;
         }
       }
@@ -214,6 +256,8 @@ Return JSON: { "questions": [{ "question_text": "...", "context_summary": "..." 
     }
   }
 
+  const assignedContact =
+    analysis.contributors[0] || "Repository Maintainer / Project Mentor";
   const linkedClaims = [claim1, claim2, claim3];
   const generated: GapQuestion[] = questionTexts.map((qt, idx) => ({
     id: buildScopedGapId(projectId, idx + 1),
@@ -221,15 +265,88 @@ Return JSON: { "questions": [{ "question_text": "...", "context_summary": "..." 
     claim_id:
       linkedClaims[idx]?.id ||
       claims[0]?.id ||
-      `CLM-CUSTOM-${projectId.toUpperCase().slice(0, 12)}-GAP-${idx + 1}`,
+      `CLM-CUSTOM-${getProjectTag(projectId)}LEAD-GAP-${idx + 1}`,
     question_text: qt.question_text,
     context_summary: qt.context_summary,
-    assigned_contact_if_unanswered: "Repository Maintainer / Project Mentor",
+    assigned_contact_if_unanswered: assignedContact,
     status: "pending",
   }));
 
   await repository.saveGapQuestions(generated);
   return generated;
+}
+
+/**
+ * Appends 1 dynamic, source-specific Gap-Interview question when live GitHub or
+ * Google Doc content is appended into an existing workspace (e.g. CampusConnect).
+ */
+export async function appendGapQuestionForLiveImport(params: {
+  projectId: string;
+  importedLabel: string;
+  sourceIds: string[];
+}): Promise<GapQuestion | null> {
+  const { projectId, importedLabel, sourceIds } = params;
+  if (sourceIds.length === 0) return null;
+
+  const existing = await getOrGenerateGapQuestions(projectId, "incoming_lead");
+  const [project, allSources, allChunks, v10Lead] = await Promise.all([
+    repository.getProject(projectId),
+    repository.listSources(projectId),
+    repository.listChunks(projectId),
+    repository.getDraftVersion(projectId, "incoming_lead", "v1.0"),
+  ]);
+
+  const sourceIdSet = new Set(sourceIds);
+  const importedSources = allSources.filter((s) => sourceIdSet.has(s.id));
+  const importedChunks = allChunks.filter((c) => sourceIdSet.has(c.source_id));
+  const analysis = analyzeWorkspaceSources(importedSources, importedChunks);
+
+  const claims = v10Lead?.claims || [];
+  const linkedClaim =
+    claims.find((c) => (c.evidence || []).some((e) => sourceIdSet.has(e.source_id))) ||
+    claims.find((c) => c.id.startsWith("CLM-CUSTOM-")) ||
+    claims[0];
+  if (!linkedClaim) return null;
+
+  const projectName = project?.name || projectId;
+  const labelSlug = importedLabel
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 22);
+  const gapId = `GAP-APPEND-${getProjectTag(projectId)}${labelSlug || "LIVE"}`;
+
+  const alreadyExists = existing.find((q) => q.id === gapId);
+  if (alreadyExists) {
+    return alreadyExists;
+  }
+
+  const stackHint =
+    analysis.techStack.length > 0
+      ? ` (stack: ${analysis.techStack.slice(0, 3).join(", ")})`
+      : "";
+  const activeHint =
+    analysis.issueLines[0] ||
+    analysis.prLines[0] ||
+    analysis.commitLines[0] ||
+    analysis.readmeSummaryLine ||
+    analysis.docSummaryLine;
+
+  const appended: GapQuestion = {
+    id: gapId,
+    project_id: projectId,
+    claim_id: linkedClaim.id,
+    question_text: `How does the newly imported ${importedLabel} source${stackHint} integrate with ${projectName}, and who owns its open issues and deployment handoff?`,
+    context_summary: activeHint
+      ? `Imported live source "${importedLabel}" (${activeHint}) — integration boundaries & maintainer ownership need confirmation.`
+      : `Imported live source "${importedLabel}" — integration boundaries & maintainer ownership need confirmation.`,
+    assigned_contact_if_unanswered:
+      analysis.contributors[0] || "Repository Maintainer / Project Mentor",
+    status: "pending",
+  };
+
+  await repository.saveGapQuestions([appended]);
+  return appended;
 }
 
 /**

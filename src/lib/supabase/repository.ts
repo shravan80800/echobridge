@@ -1406,7 +1406,12 @@ export class EchoBridgeRepository {
       } catch (err) {
         console.warn("[Supabase] findGapQuestionById fallback:", err);
       }
-      if (!question) {
+      if (
+        !question &&
+        (questionId === "GAP-Q-01" ||
+          questionId === "GAP-Q-02" ||
+          questionId === "GAP-Q-03")
+      ) {
         await this.listGapQuestions("CampusConnect");
       }
     }

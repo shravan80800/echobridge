@@ -22,13 +22,12 @@ import type {
   EvidenceRecord,
   EvidenceState,
   HandoverSection,
-  Role,
   Source,
 } from "@/types/echobridge.types";
 import { repository } from "@/lib/supabase/repository";
 import { getGeminiClient } from "@/lib/gemini/client";
 import { filterChunksForAudience, enforcePostGenerationGuard } from "@/services/trust/rbac.service";
-import { verifyClaim } from "@/services/trust/verifier.service";
+import { verifyClaim, evaluateDeterministicEntailment } from "@/services/trust/verifier.service";
 import { detectConflictsInChunks, applyConflictToClaim } from "@/services/trust/conflict.service";
 import { isClaimStale } from "@/utils/date-freshness";
 import { computeConfidenceBreakdown } from "@/services/trust/confidence.service";
@@ -38,6 +37,10 @@ import {
   buildDraftVersionId,
   buildScopedClaimId,
 } from "@/utils/project-scope";
+import {
+  analyzeWorkspaceSources,
+  extractMeaningfulLines,
+} from "@/utils/repo-analysis";
 
 const VALID_SECTIONS: ReadonlySet<HandoverSection> = new Set([
   "architecture",
@@ -321,6 +324,334 @@ export function synthesizeCustomChunkClaims(params: {
   return synthesized;
 }
 
+function buildEvidenceFromChunk(
+  chunk: Chunk,
+  sourcesById: Map<string, Source>,
+  quotedSpan: string
+): EvidenceRecord {
+  const source = sourcesById.get(chunk.source_id);
+  return {
+    chunk_id: chunk.id,
+    source_id: chunk.source_id,
+    source_type: source?.source_type || "document",
+    source_title: source?.title || chunk.source_id,
+    author: chunk.author || source?.author || "Uploaded Contributor",
+    evidence_timestamp:
+      chunk.chunk_timestamp || source?.source_timestamp || new Date().toISOString(),
+    quoted_span: quotedSpan,
+    is_verbatim_verified: true,
+    entailment_verdict: "supported",
+  };
+}
+
+function pickCleanVerbatimLine(chunk: Chunk, matcher?: RegExp, lineIndex = 0): string {
+  const lines = extractMeaningfulLines(chunk.content);
+  const chosen =
+    (matcher ? lines.find((l) => matcher.test(l)) : undefined) ||
+    lines[lineIndex] ||
+    lines[0];
+  if (chosen && chunk.content.toLowerCase().includes(chosen.toLowerCase())) {
+    if (chosen.length <= 140) return chosen;
+    const clipped = chosen.slice(0, 140).replace(/\s+\S*$/, "");
+    if (clipped.length >= 16) return clipped;
+  }
+  return extractVerbatimQuotedSpan(chunk.content);
+}
+
+function pickBalancedPhraseSpan(chunk: Chunk, maxWords = 5): string {
+  const line = pickCleanVerbatimLine(chunk);
+  if (!line) return "";
+  const regex = new RegExp(`^\\S+(?:\\s+\\S+){0,${Math.max(1, maxWords - 1)}}`);
+  const match = line.match(regex);
+  return match?.[0] || line.slice(0, 60);
+}
+
+export function synthesizeStandaloneWorkspaceClaims(params: {
+  projectId: string;
+  projectName: string;
+  draftVersionId: string;
+  targetRole: AudienceRole;
+  permittedChunks: Chunk[];
+  sources: Source[];
+  sourcesById: Map<string, Source>;
+  existingClaims: ClaimRecord[];
+}): ClaimRecord[] {
+  const {
+    projectId,
+    projectName,
+    draftVersionId,
+    targetRole,
+    permittedChunks,
+    sources,
+    sourcesById,
+    existingClaims,
+  } = params;
+
+  if (permittedChunks.length === 0 && sources.length === 0) {
+    return [];
+  }
+
+  const analysis = analyzeWorkspaceSources(sources, permittedChunks);
+  const nowIso = new Date().toISOString();
+  const generated: ClaimRecord[] = [];
+  const hasSection = (section: HandoverSection) =>
+    existingClaims.some((c) => c.section === section) ||
+    generated.some((c) => c.section === section);
+
+  const pushClaim = (
+    suffix: string,
+    section: HandoverSection,
+    claimType: ClaimType,
+    text: string,
+    evidenceState: EvidenceState,
+    evidence: EvidenceRecord[],
+    acl: AudienceRole[]
+  ) => {
+    const id = buildScopedClaimId("CLM-CUSTOM", projectId, targetRole, suffix);
+    if (
+      existingClaims.some((c) => c.id === id) ||
+      generated.some((c) => c.id === id)
+    ) {
+      return;
+    }
+    generated.push({
+      id,
+      draft_version_id: draftVersionId,
+      project_id: projectId,
+      audience_role: targetRole,
+      section,
+      claim_type: claimType,
+      text,
+      evidence_state: evidenceState,
+      evidence,
+      audience_acl: [...acl],
+      review: { status: "pending" },
+      created_at: nowIso,
+    });
+  };
+
+  // 1. Attempt cross-source corroborated claim when 2+ independent authors exist
+  const primaryChunk = analysis.readmeChunk || analysis.docChunks[0] || permittedChunks[0];
+  const secondaryChunk = permittedChunks.find(
+    (c) => primaryChunk && c.id !== primaryChunk.id && c.author !== primaryChunk.author
+  );
+  if (primaryChunk && secondaryChunk) {
+    const spanA = pickBalancedPhraseSpan(primaryChunk, 5);
+    const spanB = pickBalancedPhraseSpan(secondaryChunk, 5);
+    if (spanA && spanB) {
+      const candidateText = `${spanA} — ${spanB}`;
+      const okA =
+        evaluateDeterministicEntailment(candidateText, primaryChunk.content, spanA) ===
+        "supported";
+      const okB =
+        evaluateDeterministicEntailment(candidateText, secondaryChunk.content, spanB) ===
+        "supported";
+      if (okA && okB) {
+        const unionAcl = primaryChunk.allowed_roles.filter((r) =>
+          secondaryChunk.allowed_roles.includes(r)
+        );
+        const safeAcl: AudienceRole[] =
+          unionAcl.length > 0 ? unionAcl : [targetRole];
+        pushClaim(
+          "ARCH-CORROB",
+          "architecture",
+          "decision",
+          candidateText,
+          "corroborated",
+          [
+            buildEvidenceFromChunk(primaryChunk, sourcesById, spanA),
+            buildEvidenceFromChunk(secondaryChunk, sourcesById, spanB),
+          ],
+          safeAcl
+        );
+      }
+    }
+  }
+
+  // 2. Grounded claims across all 7 Handover sections
+  if (analysis.readmeChunk || analysis.docChunks[0]) {
+    const archChunk = (analysis.readmeChunk || analysis.docChunks[0])!;
+    const archSpan = pickCleanVerbatimLine(archChunk);
+    if (archSpan && !hasSection("architecture")) {
+      const stackPrefix =
+        analysis.techStack.length > 0
+          ? `${projectName} stack (${analysis.techStack.slice(0, 4).join(", ")}): `
+          : "";
+      pushClaim(
+        "ARCH-OVERVIEW",
+        "architecture",
+        "decision",
+        `${stackPrefix}${archSpan}`,
+        "single_source",
+        [buildEvidenceFromChunk(archChunk, sourcesById, archSpan)],
+        archChunk.allowed_roles
+      );
+    }
+
+    const day1Line =
+      pickCleanVerbatimLine(
+        archChunk,
+        /\b(?:install|setup|clone|npm|pnpm|yarn|env|quick\s*start|getting started|usage)\b/i
+      ) || archSpan;
+    if (day1Line && !hasSection("onboarding_day1")) {
+      pushClaim(
+        "ONB-DAY1",
+        "onboarding_day1",
+        "next_action",
+        day1Line,
+        "single_source",
+        [buildEvidenceFromChunk(archChunk, sourcesById, day1Line)],
+        archChunk.allowed_roles
+      );
+    }
+  }
+
+  if (analysis.commitsChunk && !hasSection("decisions")) {
+    const commitSpan = pickCleanVerbatimLine(analysis.commitsChunk, undefined, 0);
+    if (commitSpan) {
+      pushClaim(
+        "DECISIONS-COMMITS",
+        "decisions",
+        "decision",
+        commitSpan,
+        "single_source",
+        [buildEvidenceFromChunk(analysis.commitsChunk, sourcesById, commitSpan)],
+        analysis.commitsChunk.allowed_roles
+      );
+    }
+  }
+
+  if (analysis.commitsChunk && !hasSection("contacts_ownership")) {
+    const contributorSpan = pickCleanVerbatimLine(
+      analysis.commitsChunk,
+      /\s+[—-]\s+[^—-]+$/
+    );
+    if (contributorSpan) {
+      pushClaim(
+        "OWNER-COMMITTERS",
+        "contacts_ownership",
+        "owner",
+        contributorSpan,
+        "single_source",
+        [buildEvidenceFromChunk(analysis.commitsChunk, sourcesById, contributorSpan)],
+        analysis.commitsChunk.allowed_roles
+      );
+    }
+  } else if (primaryChunk && !hasSection("contacts_ownership")) {
+    const ownerSpan = pickCleanVerbatimLine(
+      primaryChunk,
+      /\b(?:owner|maintainer|lead|author|contact|team)\b/i
+    );
+    if (ownerSpan) {
+      pushClaim(
+        "OWNER-DOC",
+        "contacts_ownership",
+        "owner",
+        ownerSpan,
+        "single_source",
+        [buildEvidenceFromChunk(primaryChunk, sourcesById, ownerSpan)],
+        primaryChunk.allowed_roles
+      );
+    }
+  }
+
+  const workChunk = analysis.issuesChunk || analysis.pullsChunk || analysis.docChunks[1] || primaryChunk;
+  if (workChunk && !hasSection("tasks_dependencies")) {
+    const issueSpan = pickCleanVerbatimLine(workChunk);
+    if (issueSpan) {
+      pushClaim(
+        "TASKS-BACKLOG",
+        "tasks_dependencies",
+        analysis.issueLines.length > 0 ? "risk" : "next_action",
+        issueSpan,
+        "single_source",
+        [buildEvidenceFromChunk(workChunk, sourcesById, issueSpan)],
+        workChunk.allowed_roles
+      );
+    }
+  }
+
+  const week1Chunk = analysis.pullsChunk || analysis.issuesChunk || analysis.commitsChunk || primaryChunk;
+  if (week1Chunk && !hasSection("onboarding_week1")) {
+    const week1Span = pickCleanVerbatimLine(week1Chunk);
+    if (week1Span) {
+      pushClaim(
+        "ONB-WEEK1",
+        "onboarding_week1",
+        "next_action",
+        week1Span,
+        "single_source",
+        [buildEvidenceFromChunk(week1Chunk, sourcesById, week1Span)],
+        week1Chunk.allowed_roles
+      );
+    }
+  }
+
+  const month1Chunk =
+    analysis.commitsChunk || analysis.pullsChunk || analysis.readmeChunk || primaryChunk;
+  if (month1Chunk && !hasSection("onboarding_month1")) {
+    const month1Span = pickCleanVerbatimLine(month1Chunk, undefined, 1);
+    if (month1Span) {
+      pushClaim(
+        "ONB-MONTH1",
+        "onboarding_month1",
+        "decision",
+        month1Span,
+        "single_source",
+        [buildEvidenceFromChunk(month1Chunk, sourcesById, month1Span)],
+        month1Chunk.allowed_roles
+      );
+    }
+  }
+
+  // 3. Explicit Unsupported Knowledge-Gap claims (ready for Stage 4 Gap-Interview resolution)
+  const existingUnsupportedCount = existingClaims.filter(
+    (c) => c.evidence_state === "unsupported"
+  ).length;
+  if (existingUnsupportedCount < 3) {
+    const stackLabel =
+      analysis.techStack.length > 0
+        ? analysis.techStack.slice(0, 4).join(", ")
+        : analysis.readmeTitle || `${projectName} core stack`;
+    const activeFocusLabel =
+      analysis.issueLines[0] ||
+      analysis.prLines[0] ||
+      analysis.commitLines[0] ||
+      analysis.issuesTitle ||
+      `${projectName} active issues and PRs`;
+
+    pushClaim(
+      "GAP-1",
+      "decisions",
+      "decision",
+      `Architecture rationale gap for ${projectName}: why ${stackLabel} was selected and which technical trade-offs must be preserved is undocumented.`,
+      "unsupported",
+      [],
+      ["incoming_lead", "incoming_intern"]
+    );
+    pushClaim(
+      "GAP-2",
+      "tasks_dependencies",
+      "risk",
+      `Priority & blocker gap for ${projectName}: week-one triage order and sign-off owner for ${activeFocusLabel} is undocumented.`,
+      "unsupported",
+      [],
+      ["incoming_lead", "incoming_intern"]
+    );
+    pushClaim(
+      "GAP-3",
+      "contacts_ownership",
+      "owner",
+      `Deployment & secret ownership gap for ${projectName}: environment variable management, deployment triggers, and rollback ownership are undocumented.`,
+      "unsupported",
+      [],
+      ["incoming_lead", "incoming_intern"]
+    );
+  }
+
+  return generated;
+}
+
 export interface ReconstructionResult {
   draftVersion: DraftVersion;
   claims: ClaimRecord[];
@@ -424,6 +755,9 @@ Rules:
       }
     }
   } else {
+    const projectRecord = await repository.getProject(projectId);
+    const projectName = projectRecord?.name || projectId;
+
     if (gemini && permittedChunks.length > 0) {
       try {
         const chunkXml = permittedChunks
@@ -433,15 +767,16 @@ Rules:
           )
           .join("\n\n");
 
-        const prompt = `You are EchoBridge Trust Pipeline Generator.
+        const prompt = `You are EchoBridge Trust Pipeline Generator for workspace "${projectName}".
 Synthesize verified atomic handover claims strictly based on the following authorised sources:
 ${chunkXml}
 
 Rules:
-1. Every claim MUST be directly substantiated by the text in a <chunk>.
-2. Every claim MUST cite the chunk_id and the exact verbatim quoted_span from that chunk.
-3. If an important topic has no supporting chunk, output an atomic claim with evidence_state: "unsupported" and text: "Insufficient evidence in sources: [topic]".
-4. Return a JSON object with array "claims".`;
+1. Every substantiated claim MUST cite chunk_id and exact verbatim quoted_span from that chunk. Cite 2+ independent-author chunks when corroborated across sources (e.g. README + Commits/Issues/PRs).
+2. Cover all applicable handover sections: architecture, decisions, tasks_dependencies, contacts_ownership, onboarding_day1, onboarding_week1, onboarding_month1.
+3. claim_type MUST be one of: decision, owner, risk, dependency, next_action, contact.
+4. For critical unwritten knowledge gaps (architecture rationale, open-issue priority/sign-off, deployment & secret ownership), include unsupported claims with evidence: [] and evidence_state: "unsupported".
+5. Return a JSON object with array "claims".`;
 
         const response = await gemini.models.generateContent({
           model: "gemini-2.5-flash",
@@ -464,8 +799,22 @@ Rules:
           });
         }
       } catch {
-        // Fall through to deterministic custom chunk synthesis
+        // Fall through to deterministic standalone workspace synthesis
       }
+    }
+
+    const standaloneClaims = synthesizeStandaloneWorkspaceClaims({
+      projectId,
+      projectName,
+      draftVersionId,
+      targetRole,
+      permittedChunks,
+      sources: allSources,
+      sourcesById,
+      existingClaims: rawClaims,
+    });
+    if (standaloneClaims.length > 0) {
+      rawClaims.push(...standaloneClaims);
     }
   }
 

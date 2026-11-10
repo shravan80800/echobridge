@@ -1,3 +1,5 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/live-import/route";
@@ -5,10 +7,15 @@ import {
   GET as GET_PROJECTS,
   DELETE as DELETE_PROJECT,
 } from "@/app/api/projects/route";
-import { GET as GET_GAP_INTERVIEW } from "@/app/api/gap-interview/route";
+import {
+  GET as GET_GAP_INTERVIEW,
+  POST as POST_GAP_INTERVIEW,
+} from "@/app/api/gap-interview/route";
 import { GET as GET_REVIEW } from "@/app/api/review/route";
 import { GET as GET_HANDOVER } from "@/app/api/handover/route";
 import { POST as POST_RECEIPT } from "@/app/api/receipt/route";
+import { ComprehensionQuizModal } from "@/components/handover/ComprehensionQuizModal";
+import { OnboardingBoard } from "@/components/handover/OnboardingBoard";
 import {
   parseGitHubRepoUrl,
   parseGoogleDocUrl,
@@ -619,6 +626,275 @@ describe("Live URL Importer (GitHub & Public Google Docs)", () => {
         "CampusConnect",
       ]);
       expect(await repository.listSources("CampusConnect")).toHaveLength(8);
+    });
+  });
+
+  describe("Standalone Isolation & Repo-Dynamic Interview / Quiz", () => {
+    function createCustomRepoFetch() {
+      const readmeBody = [
+        "# Nebula API",
+        "",
+        "High-throughput service built with FastAPI, Python, and PostgreSQL.",
+        "",
+        "Quick start: clone repository and run uvicorn app.main:app --reload for local development.",
+      ].join("\n");
+
+      return vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/readme")) {
+          return new Response(
+            JSON.stringify({
+              encoding: "base64",
+              content: Buffer.from(readmeBody, "utf-8").toString("base64"),
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        if (url.includes("/commits")) {
+          return new Response(
+            JSON.stringify([
+              {
+                sha: "c0ffee1234567890",
+                commit: {
+                  message: "feat: FastAPI PostgreSQL health check and uvicorn metrics route",
+                  author: { name: "Maya Lin" },
+                },
+              },
+              {
+                sha: "bada551234567890",
+                commit: {
+                  message: "docs: document staging deployment pipeline for nebula-api",
+                  author: { name: "Devon Park" },
+                },
+              },
+            ]),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        if (url.includes("/issues")) {
+          return new Response(
+            JSON.stringify([
+              { number: 42, title: "Fix JWT refresh race condition", state: "open" },
+              { number: 45, title: "Add rate limit metrics to /health", state: "open" },
+            ]),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        if (url.includes("/pulls")) {
+          return new Response(
+            JSON.stringify([
+              { number: 43, title: "Add rate limiter integration tests", state: "open" },
+            ]),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        return new Response("Not Found", { status: 404 });
+      });
+    }
+
+    it("isolates sources, multi-section claims, corroborated/unsupported states, and dynamic interview/quiz for gh-* projects", async () => {
+      repository.resetInMemoryStore(true);
+      vi.stubGlobal("fetch", createCustomRepoFetch());
+
+      const importRes = await POST(
+        new NextRequest("http://localhost:3000/api/live-import", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "github",
+            url: "https://github.com/acme/nebula-api",
+            mode: "new_workspace",
+          }),
+        })
+      );
+      const importJson = await importRes.json();
+      expect(importRes.status).toBe(200);
+      const customProjectId = importJson.projectId as string;
+      expect(customProjectId).toBe("gh-acme-nebula-api");
+
+      // 1. Sources strictly isolated to GitHub workspace
+      const sources = await repository.listSources(customProjectId);
+      expect(sources).toHaveLength(4);
+      expect(sources.every((s) => !s.id.startsWith("SRC-"))).toBe(true);
+
+      // 2. Review claims cover all sections & include corroborated + single_source + unsupported gaps
+      const reviewRes = await GET_REVIEW(
+        new NextRequest(
+          `http://localhost:3000/api/review?projectId=${customProjectId}&role=incoming_lead`
+        )
+      );
+      const reviewJson = await reviewRes.json();
+      expect(reviewRes.status).toBe(200);
+      const v10 = reviewJson.drafts.find(
+        (d: { version_label: string }) => d.version_label === "v1.0"
+      );
+      expect(v10).toBeTruthy();
+
+      const claimSections = new Set(
+        v10.claims.map((c: { section: string }) => c.section)
+      );
+      expect(claimSections.has("architecture")).toBe(true);
+      expect(claimSections.has("decisions")).toBe(true);
+      expect(claimSections.has("tasks_dependencies")).toBe(true);
+      expect(claimSections.has("contacts_ownership")).toBe(true);
+      expect(claimSections.has("onboarding_day1")).toBe(true);
+      expect(claimSections.has("onboarding_week1")).toBe(true);
+      expect(claimSections.has("onboarding_month1")).toBe(true);
+
+      const states = v10.claims.map(
+        (c: { evidence_state: string }) => c.evidence_state
+      );
+      expect(states).toContain("corroborated");
+      expect(states).toContain("single_source");
+      expect(states).toContain("unsupported");
+
+      const allClaimText = v10.claims
+        .map((c: { text: string }) => c.text)
+        .join("\n");
+      expect(allClaimText).not.toContain("Prof. Deshmukh");
+      expect(allClaimText).not.toContain("March 15");
+      expect(allClaimText).not.toContain("Redis");
+
+      // 3. Dynamic Gap-Interview questions reflect FastAPI & Issue #42, zero CampusConnect text
+      const gapRes = await GET_GAP_INTERVIEW(
+        new NextRequest(
+          `http://localhost:3000/api/gap-interview?projectId=${customProjectId}&role=incoming_lead`
+        )
+      );
+      const gapJson = await gapRes.json();
+      expect(gapRes.status).toBe(200);
+      expect(gapJson.questions).toHaveLength(3);
+      const joinedGapText = gapJson.questions
+        .map(
+          (q: { question_text: string; context_summary: string }) =>
+            `${q.question_text} ${q.context_summary}`
+        )
+        .join("\n");
+      expect(joinedGapText).toContain("acme/nebula-api");
+      expect(joinedGapText).toContain("FastAPI");
+      expect(joinedGapText).toContain("#42");
+      expect(joinedGapText).not.toContain("Redis");
+      expect(joinedGapText).not.toContain("campusconnect.dev");
+
+      // 4. Answering Q1 promotes linked v1.1 & v2.0 claim to attested
+      const q1Id = gapJson.questions[0].id as string;
+      const ansRes = await POST_GAP_INTERVIEW(
+        new NextRequest("http://localhost:3000/api/gap-interview", {
+          method: "POST",
+          body: JSON.stringify({
+            projectId: customProjectId,
+            audienceRole: "incoming_lead",
+            questionId: q1Id,
+            answerText:
+              "FastAPI was chosen for async validation and automatic OpenAPI docs.",
+            answeredBy: "Maya Lin",
+          }),
+        })
+      );
+      const ansJson = await ansRes.json();
+      expect(ansRes.status).toBe(200);
+      expect(ansJson.data.updatedClaim.evidence_state).toBe("attested");
+
+      const v11After = await repository.getDraftVersion(
+        customProjectId,
+        "incoming_lead",
+        "v1.1"
+      );
+      expect(
+        v11After?.claims.find(
+          (c) =>
+            c.evidence_state === "attested" &&
+            c.text.includes("async validation")
+        )
+      ).toBeTruthy();
+
+      const v20After = await repository.getDraftVersion(
+        customProjectId,
+        "incoming_lead",
+        "v2.0"
+      );
+      const attestedClaimV20 = v20After?.claims.find(
+        (c) => c.evidence_state === "attested" && c.text.includes("async validation")
+      );
+      expect(attestedClaimV20).toBeTruthy();
+
+      // 5. /api/handover returns dynamic comprehensionQuestions & renders cleanly in Modal & Board
+      const handoverRes = await GET_HANDOVER(
+        new NextRequest(
+          `http://localhost:3000/api/handover?projectId=${customProjectId}&role=incoming_lead`
+        )
+      );
+      const handoverJson = await handoverRes.json();
+      expect(handoverRes.status).toBe(200);
+      expect(handoverJson.comprehensionQuestions).toHaveLength(3);
+      expect(handoverJson.questions).toHaveLength(3);
+
+      const modalHtml = renderToStaticMarkup(
+        React.createElement(ComprehensionQuizModal, {
+          isOpen: true,
+          onClose: () => {},
+          questions: handoverJson.comprehensionQuestions,
+          recipientName: "Devon Park",
+          recipientRoleName: "Incoming Team Lead",
+          cleanMode: true,
+          onAcknowledge: async () => {},
+        })
+      );
+      expect(modalHtml).toContain("acme/nebula-api");
+      expect(modalHtml).toContain("FastAPI");
+      expect(modalHtml).toContain("#42");
+      expect(modalHtml).toContain("async validation");
+      expect(modalHtml).not.toContain("March 15");
+      expect(modalHtml).not.toContain("Redis");
+
+      const boardHtml = renderToStaticMarkup(
+        React.createElement(OnboardingBoard, {
+          claims: v20After?.claims || [],
+          audienceRole: "incoming_lead",
+          cleanMode: true,
+        })
+      );
+      expect(boardHtml).not.toContain("Prof. Deshmukh");
+      expect(boardHtml).not.toContain("Worker restart script");
+      expect(boardHtml).not.toContain("Redis");
+    });
+
+    it("appends a dynamic repo-specific Gap Question when importing in append mode into CampusConnect", async () => {
+      repository.resetInMemoryStore(true);
+      vi.stubGlobal("fetch", createCustomRepoFetch());
+
+      const initialRes = await GET_GAP_INTERVIEW(
+        new NextRequest(
+          "http://localhost:3000/api/gap-interview?projectId=CampusConnect&role=incoming_lead"
+        )
+      );
+      const initialJson = await initialRes.json();
+      expect(initialJson.questions).toHaveLength(3);
+
+      const appendRes = await POST(
+        new NextRequest("http://localhost:3000/api/live-import", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "github",
+            url: "https://github.com/acme/nebula-api",
+            mode: "append",
+            projectId: "CampusConnect",
+          }),
+        })
+      );
+      expect(appendRes.status).toBe(200);
+
+      const afterRes = await GET_GAP_INTERVIEW(
+        new NextRequest(
+          "http://localhost:3000/api/gap-interview?projectId=CampusConnect&role=incoming_lead"
+        )
+      );
+      const afterJson = await afterRes.json();
+      expect(afterJson.questions).toHaveLength(4);
+      const appendedQ = afterJson.questions.find((q: { id: string }) =>
+        q.id.startsWith("GAP-APPEND-")
+      );
+      expect(appendedQ).toBeTruthy();
+      expect(appendedQ.question_text).toContain("acme/nebula-api");
     });
   });
 });
